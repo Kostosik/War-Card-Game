@@ -1,9 +1,10 @@
-using System.Text.Json;
 using Engine.Hosting.Desktop;
 using Engine.Runtime;
 using Engine.Serialization.Content;
 using Engine.Serialization.UI;
 using Engine.UI.Assets;
+using GameProject.Game.Settings;
+using System.Text.Json;
 
 namespace GameProject;
 
@@ -11,6 +12,8 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
+        var settings = GameSettingsStore.Load();
+
         var startupScenePath =
             ResolveStartupScenePath(
                 "War Card Game.vibeproject");
@@ -22,6 +25,12 @@ internal static class Program
                 new DesktopGameHostOptions
                 {
                     Title = "War Card Game",
+
+                    Width = settings.WindowWidth,
+                    Height = settings.WindowHeight,
+
+                    Fullscreen = settings.Fullscreen,
+                    VSync = settings.VSync,
 
                     ConfigureContentLoaders = loaders =>
                     {

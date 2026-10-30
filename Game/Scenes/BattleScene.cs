@@ -1,21 +1,17 @@
 ﻿
 using Engine.Core.Assets;
 using Engine.Core.Events;
-using Engine.Core.Math;
 using Engine.Core.Time;
-using Engine.Graphics.Resources;
 using Engine.UI.Actions;
 using Engine.UI.Assets;
 using Engine.UI.Controls;
 using Engine.UI.Core;
-using Engine.UI.Layout;
 using GameProject.Combat;
-using GameProject.Combat.Cards;
-using GameProject.Combat.Combatants;
-using GameProject.Combat.Enemies;
-using GameProject.Combat.UI;
+using GameProject.Game.Campaign;
 using GameProject.Game.Flow;
+using GameProject.Game.Operations;
 using GameProject.Game.Scenes.Modals;
+using GameProject.Combat.Battlefield;
 
 namespace GameProject.Game.Scenes;
 
@@ -24,8 +20,10 @@ internal sealed class BattleScene : IGameScene
     private sealed record EndTurnRequestedEvent : IEvent;
     private sealed record ReturnToHeadquartersRequestedEvent : IEvent;
     private Action<IGameScene>? _requestScene;
-
-    private bool _victoryModalShown;
+    private readonly CampaignState _campaign;
+    private UiLabel? _leftFlankInfoLabel;
+    private UiLabel? _centerInfoLabel;
+    private UiLabel? _rightFlankInfoLabel;
     private GameSceneContext? _context;
     private UiSystem? _ui;
     private UiActionRuntime? _uiActions;
@@ -35,19 +33,16 @@ internal sealed class BattleScene : IGameScene
     private BattleDefeatModal? _defeatModal;
 
     private bool _resultModalShown;
-    private CombatTurnController? _combatController;
+    private BattlefieldState? _battlefield;
 
     private UiLabel? _battleNameLabel;
     private UiLabel? _battleInfoLabel;
-    private UiLabel? _battleResultLabel;
 
-    private CombatPlayAreaDropTarget? _playAreaDropTarget;
-    private readonly List<CardView> _handCardViews = new();
-
-    private float _handCardWidth;
-
-    private const float HandCardGap = 18.0f;
-    private const float HandCardY = 500.0f;
+    public BattleScene(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        _campaign = campaign;
+    }
 
     public void Initialize(
         GameSceneContext context,
@@ -57,6 +52,13 @@ internal sealed class BattleScene : IGameScene
         ArgumentNullException.ThrowIfNull(requestScene);
 
         _context = context;
+
+        if (_campaign.CurrentOperation is null)
+        {
+            throw new InvalidOperationException(
+                "Battle cannot start without an active operation.");
+        }
+
         _requestScene = requestScene;
 
         var ui = context.CreateUiSystem();
@@ -77,21 +79,18 @@ internal sealed class BattleScene : IGameScene
         var battleUiAsset = context.Host.Content.Load<UiAsset>(
             new AssetPath("UI/BattleUI.ui"));
 
-        var victoryModalAsset = context.Host.Content.Load<UiAsset>(
-    new AssetPath("UI/BattleVictoryModal.ui"));
-
-
         _victoryModal = new BattleVictoryModal(
             context,
             ui,
             _uiActions,
-            _ => requestScene(new HeadquartersScene()));
+            ReturnToHeadquarters);
 
         _defeatModal = new BattleDefeatModal(
             context,
             ui,
             _uiActions,
-            _ => requestScene(new HeadquartersScene()));
+            ReturnToHeadquarters);
+
         _battleUiInstance = _uiActions.Load(battleUiAsset);
 
         _battleNameLabel = FindLabel(
@@ -104,29 +103,22 @@ internal sealed class BattleScene : IGameScene
             _battleUiInstance,
             "BattleInfo");
 
-        _battleResultLabel = FindLabel(
+        _leftFlankInfoLabel = FindLabel(
+    battleUiAsset,
+    _battleUiInstance,
+    "LeftFlankInfo");
+
+        _centerInfoLabel = FindLabel(
             battleUiAsset,
             _battleUiInstance,
-            "BattleResult");
+            "CenterInfo");
 
-        _combatController = CreateInitialCombat();
+        _rightFlankInfoLabel = FindLabel(
+            battleUiAsset,
+            _battleUiInstance,
+            "RightFlankInfo");
 
-        CreatePlayAreaDropTarget(battleUiAsset);
-
-        var cardAsset = context.Host.Content.Load<UiAsset>(
-            new AssetPath("Cards/Card.ui"));
-
-        CreateHandViews(cardAsset);
-
-        _endTurnSubscription =
-            context.Runtime.Events.Subscribe<EndTurnRequestedEvent>(
-                _ =>
-                {
-                    _combatController?.EndPlayerTurn();
-
-                    RefreshBattleUi();
-                    RefreshHandUi();
-                });
+        _battlefield = BattlefieldFactory.CreatePrototype();
 
         RefreshBattleUi();
 
@@ -142,7 +134,6 @@ internal sealed class BattleScene : IGameScene
         _ui?.Update(time.Delta.TotalSeconds);
 
         RefreshBattleUi();
-        RefreshHandUi();
     }
 
     public void Render(double interpolationAlpha)
@@ -165,164 +156,53 @@ internal sealed class BattleScene : IGameScene
             }
         }
 
-        _handCardViews.Clear();
-
 
         _victoryModal?.Dispose();
         _victoryModal = null;
 
         _defeatModal?.Dispose();
         _defeatModal = null;
-        _playAreaDropTarget = null;
         _battleUiInstance = null;
 
         _uiActions?.Dispose();
         _uiActions = null;
-
-        _combatController = null;
+        _leftFlankInfoLabel = null;
+        _centerInfoLabel = null;
+        _rightFlankInfoLabel = null;
         _battleNameLabel = null;
         _battleInfoLabel = null;
-        _battleResultLabel = null;
         _ui = null;
         _context = null;
         _victoryModal = null;
         _requestScene = null;
-        _victoryModalShown = false;
+        _battlefield = null;
         Console.WriteLine("Battle scene disposed.");
     }
 
-    private void CreatePlayAreaDropTarget(UiAsset asset)
+    
+    private void ReturnToHeadquarters(CombatResult result)
     {
-        var element = asset.Elements.SingleOrDefault(
-            element => element.Name == "PlayArea")
-            ?? throw new InvalidDataException(
-                "PlayArea was not found in BattleUI.");
-
-        var parent = _battleUiInstance!.Get(
-            element.ParentId) as UiContainer
-            ?? throw new InvalidDataException(
-                "PlayArea parent is not a UI container.");
-
-        var target = new CombatPlayAreaDropTarget(TryPlayCard)
+        var outcome = result switch
         {
-            LayoutMode = UiLayoutMode.Anchor,
-            Anchor = element.Layout.Anchor,
-            Offset = element.Layout.Offset,
-            Width = element.Layout.Size.X,
-            Height = element.Layout.Size.Y,
-            ZIndex = element.ZIndex + 1
+            CombatResult.PlayerVictory => OperationOutcome.Victory,
+            CombatResult.PlayerDefeat => OperationOutcome.Defeat,
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(result),
+                result,
+                "Cannot complete an operation with an unfinished combat.")
         };
 
-        parent.AddChild(target);
+        _campaign.CompleteCurrentOperation(outcome);
 
-        _playAreaDropTarget = target;
+        _requestScene?.Invoke(
+            new HeadquartersScene(_campaign));
     }
 
-    private bool TryPlayCard(CardDefinition definition)
-    {
-        if (_combatController is null)
-        {
-            return false;
-        }
+    
 
-        var hand = _combatController.Deck.Hand;
-
-        for (var i = 0; i < hand.Count; i++)
-        {
-            if (hand[i].Id != definition.Id)
-            {
-                continue;
-            }
-
-            if (!_combatController.TryPlayCard(i))
-            {
-                return false;
-            }
-
-            RefreshBattleUi();
-            RefreshHandUi();
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private void CreateHandViews(UiAsset cardAsset)
-    {
-        var hand = _combatController!.Deck.Hand;
-
-        _handCardWidth = cardAsset.CanvasSize.X;
-
-        var totalWidth =
-            hand.Count * _handCardWidth +
-            Math.Max(0, hand.Count - 1) * HandCardGap;
-
-        var canvasWidth =
-            _battleUiInstance!.Root.Width ?? 1280.0f;
-
-        var startX = (canvasWidth - totalWidth) * 0.5f;
-
-        for (var i = 0; i < hand.Count; i++)
-        {
-            var instance = _uiActions!.Load(cardAsset);
-
-            var cardView = new CardView(
-                cardAsset,
-                instance,
-                hand[i]);
-
-            _battleUiInstance.Root.AddChild(cardView);
-
-            _battleUiInstance.Root.SetPosition(
-                cardView,
-                new Vector2(
-                    startX + i * (_handCardWidth + HandCardGap),
-                    HandCardY));
-
-            _handCardViews.Add(cardView);
-        }
-    }
-
-    private void RefreshHandUi()
-    {
-        if (_combatController is null ||
-            _battleUiInstance is null)
-        {
-            return;
-        }
-
-        var hand = _combatController.Deck.Hand;
-
-        var totalWidth =
-            hand.Count * _handCardWidth +
-            Math.Max(0, hand.Count - 1) * HandCardGap;
-
-        var canvasWidth =
-            _battleUiInstance.Root.Width ?? 1280.0f;
-
-        var startX = (canvasWidth - totalWidth) * 0.5f;
-
-        for (var i = 0; i < _handCardViews.Count; i++)
-        {
-            var cardView = _handCardViews[i];
-
-            if (i >= hand.Count)
-            {
-                cardView.Visible = false;
-                continue;
-            }
-
-            cardView.Visible = true;
-            cardView.SetDefinition(hand[i]);
-
-            _battleUiInstance.Root.SetPosition(
-                cardView,
-                new Vector2(
-                    startX + i * (_handCardWidth + HandCardGap),
-                    HandCardY));
-        }
-    }
+   
+    
 
     private static UiLabel FindLabel(
         UiAsset asset,
@@ -339,89 +219,79 @@ internal sealed class BattleScene : IGameScene
                 $"UI element '{name}' is not a Label.");
     }
 
-    private static CombatTurnController CreateInitialCombat()
-    {
-        var cards =
-            Enumerable.Range(0, 5)
-                .Select(i => new CardDefinition(
-                    $"defense_{i}",
-                    CardKind.Defense,
-                    1,
-                    5))
-                .Concat(
-                    Enumerable.Range(0, 5)
-                        .Select(i => new CardDefinition(
-                            $"attack_{i}",
-                            CardKind.Attack,
-                            1,
-                            6)))
-                .ToArray();
 
-        var deck = new CardDeck(cards);
-        deck.ShuffleDrawPile();
-
-        var combat = new CombatState(
-            new CombatantState(60),
-            new CombatantState(42));
-
-        var turn = new CombatTurnState(3);
-
-        var controller = new CombatTurnController(
-            combat,
-            deck,
-            turn,
-            new EnemyIntent(EnemyIntentKind.Attack, 12));
-
-        controller.StartCombat();
-
-        return controller;
-    }
 
     private void RefreshBattleUi()
     {
-        if (_combatController is null ||
+        if (_battlefield is null ||
             _battleNameLabel is null ||
             _battleInfoLabel is null ||
-            _battleResultLabel is null)
+            _leftFlankInfoLabel is null ||
+            _centerInfoLabel is null ||
+            _rightFlankInfoLabel is null)
         {
             return;
         }
 
-        var combat = _combatController.Combat;
-        var turn = _combatController.Turn;
-        var intent = combat.CurrentEnemyIntent;
+        var battlefield = _battlefield;
 
-        _battleNameLabel.Text = "FIRST ENGAGEMENT";
+        _battleNameLabel.Text =
+            $"OPERATION {_campaign.CurrentOperationNumber} / " +
+            $"{_campaign.RegularOperationCount}";
 
         _battleInfoLabel.Text =
-            $"TURN {turn.TurnNumber} | " +
-            $"AP {turn.AvailableActionPoints}/{turn.MaxActionPoints} | " +
-            $"PLAYER {combat.Player.Health}/{combat.Player.MaxHealth} | " +
-            $"ENEMY {combat.Enemy.Health}/{combat.Enemy.MaxHealth} | " +
-            $"BLOCK {turn.Block} | " +
-            $"INTENT {intent?.Kind} {intent?.Amount}";
+            $"STEP {battlefield.StepNumber} | " +
+            $"CONTROL: PLAYER {battlefield.PlayerControlledDirections}/2 | " +
+            $"ENEMY {battlefield.EnemyControlledDirections}/2";
 
-        _battleResultLabel.Text = combat.Result switch
+        _leftFlankInfoLabel.Text =
+    FormatDirection(
+        BattleDirection.LeftFlank,
+        battlefield.LeftFlank);
+
+        _centerInfoLabel.Text =
+            FormatDirection(
+                BattleDirection.Center,
+                battlefield.Center);
+
+        _rightFlankInfoLabel.Text =
+            FormatDirection(
+                BattleDirection.RightFlank,
+                battlefield.RightFlank);
+
+        if (_resultModalShown)
+            return;
+
+        switch (battlefield.Result)
         {
-            CombatResult.PlayerVictory => "VICTORY",
-            CombatResult.PlayerDefeat => "DEFEAT",
-            _ => string.Empty
-        };
+            case BattlefieldResult.PlayerVictory:
+                _resultModalShown = true;
+                _victoryModal?.Show();
+                break;
 
-        if (!_resultModalShown)
-        {
-            switch (combat.Result)
-            {
-                case CombatResult.PlayerVictory:
-                    _resultModalShown = true;
-                    _victoryModal?.Show();
-                    break;
-
-                case CombatResult.PlayerDefeat:
-                    _resultModalShown = true;
-                    _defeatModal?.Show();
-                    break;
-            }
+            case BattlefieldResult.PlayerDefeat:
+                _resultModalShown = true;
+                _defeatModal?.Show();
+                break;
         }
+    }
+
+    private static string FormatDirection(
+    BattleDirection direction,
+    BattleDirectionState state)
+    {
+        var control = state.PlayerDetachment.IsCombatReady &&
+                      !state.EnemyDetachment.IsCombatReady
+            ? "PLAYER"
+            : !state.PlayerDetachment.IsCombatReady &&
+              state.EnemyDetachment.IsCombatReady
+                ? "ENEMY"
+                : "NONE";
+
+        return
+            $"{direction}: " +
+            $"PLAYER {state.PlayerDetachment.Health}/{state.PlayerDetachment.MaxHealth} | " +
+            $"ENEMY {state.EnemyDetachment.Health}/{state.EnemyDetachment.MaxHealth} | " +
+            $"CONTROL: {control}";
     }
 }

@@ -51,10 +51,12 @@ internal sealed class GameSceneContext : IDisposable
             _disposed,
             this);
 
+        
+
         return new UiSystem(
             Host.Graphics,
-            1280,
-            720,
+            Host.WindowWidth,
+            Host.WindowHeight,
             Host.PointerInput,
             Host.TextInput,
             Host.Cursor,

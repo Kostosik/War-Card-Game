@@ -5,6 +5,7 @@ using Engine.Core.Time;
 using Engine.UI.Actions;
 using Engine.UI.Assets;
 using Engine.UI.Core;
+using GameProject.Game.Campaign;
 using GameProject.Game.Flow;
 
 namespace GameProject.Game.Scenes;
@@ -12,7 +13,7 @@ namespace GameProject.Game.Scenes;
 internal sealed class MainMenuScene : IGameScene
 {
     private sealed record StartGameRequestedEvent : IEvent;
-
+    private sealed record OpenSettingsRequestedEvent : IEvent;
     private GameSceneContext? _context;
     private Action<IGameScene>? _requestScene;
 
@@ -21,7 +22,7 @@ internal sealed class MainMenuScene : IGameScene
     private UiAssetInstance? _menuInstance;
 
     private EventSubscription? _startGameSubscription;
-
+    private EventSubscription? _openSettingsSubscription;
     public void Initialize(
         GameSceneContext context,
         Action<IGameScene> requestScene)
@@ -41,7 +42,9 @@ internal sealed class MainMenuScene : IGameScene
         _uiActions.Register(
             "StartGame",
             () => new StartGameRequestedEvent());
-
+        _uiActions.Register(
+            "OpenSettings",
+            () => new OpenSettingsRequestedEvent());
         var menuAsset = context.Host.Content.Load<UiAsset>(
             new AssetPath("UI/MainMenu.ui"));
 
@@ -51,8 +54,14 @@ internal sealed class MainMenuScene : IGameScene
             context.Runtime.Events.Subscribe<StartGameRequestedEvent>(
                 _ =>
                 {
-                    _requestScene?.Invoke(new HeadquartersScene());
+                    _requestScene?.Invoke(new HeadquartersScene(new CampaignState()));
                 });
+        _openSettingsSubscription =
+    context.Runtime.Events.Subscribe<OpenSettingsRequestedEvent>(
+        _ =>
+        {
+            _requestScene?.Invoke(new SettingsScene());
+        });
 
         _ui.Root.AddChild(_menuInstance.Root);
 
@@ -85,7 +94,8 @@ internal sealed class MainMenuScene : IGameScene
                 _ui.Root.RemoveChild(_menuInstance.Root);
             }
         }
-
+        _openSettingsSubscription?.Dispose();
+        _openSettingsSubscription = null;
         _uiActions?.Dispose();
         _uiActions = null;
 
