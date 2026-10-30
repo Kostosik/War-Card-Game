@@ -1,14 +1,19 @@
 using Engine.Core.Assets;
 using Engine.Core.Time;
-using Engine.Hosting.Desktop;
 using Engine.Graphics.Resources;
+using Engine.Hosting.Desktop;
+using Engine.Networking.Replication;
 using Engine.Runtime;
 using Engine.Serialization.SaveLoad.Ecs;
 using Engine.Serialization.SaveLoad.Worlds;
-using Engine.Networking.Replication;
 using Engine.UI.Actions;
 using Engine.UI.Assets;
+using Engine.UI.Controls;
 using Engine.UI.Core;
+using GameProject.Combat;
+using GameProject.Combat.Cards;
+using GameProject.Combat.Combatants;
+using GameProject.Combat.Enemies;
 
 namespace GameProject;
 
@@ -21,7 +26,9 @@ internal sealed class GameMain : EngineGame
     private UiSystem? _ui;
     private UiActionRuntime? _uiActions;
     private UiAssetInstance? _battleUiInstance;
-
+    private CombatTurnController? _combatController;
+    private UiLabel? _battleNameLabel;
+    private UiLabel? _battleInfoLabel;
     public GameMain(
         DesktopGameHostContext context,
         string startupScenePath)
@@ -99,6 +106,20 @@ internal sealed class GameMain : EngineGame
             _battleUiInstance =
                 _uiActions.Load(battleUiAsset);
 
+            _battleNameLabel = FindLabel(
+                battleUiAsset,
+                _battleUiInstance,
+                "BattleName");
+
+            _battleInfoLabel = FindLabel(
+                battleUiAsset,
+                _battleUiInstance,
+                "BattleInfo");
+
+            _combatController = CreateInitialCombat();
+
+            RefreshBattleUi();
+
             ui.Root.AddChild(
                 _battleUiInstance.Root);
 
@@ -128,6 +149,7 @@ internal sealed class GameMain : EngineGame
     {
         _ui?.Update(
             time.Delta.TotalSeconds);
+        RefreshBattleUi();
     }
 
     protected override void OnRender(
@@ -160,5 +182,81 @@ internal sealed class GameMain : EngineGame
 
         Console.WriteLine(
             "VibeEngine2 game stopped.");
+    }
+
+    private static UiLabel FindLabel(
+    UiAsset asset,
+    UiAssetInstance instance,
+    string name)
+    {
+        var element = asset.Elements.SingleOrDefault(
+            element => element.Name == name)
+            ?? throw new InvalidDataException(
+                $"UI label '{name}' was not found.");
+
+        return instance.Get(element.Id) as UiLabel
+            ?? throw new InvalidDataException(
+                $"UI element '{name}' is not a Label.");
+    }
+
+    private static CombatTurnController CreateInitialCombat()
+    {
+        var cards =
+            Enumerable.Range(0, 5)
+                .Select(i => new CardDefinition(
+                    $"defense_{i}",
+                    CardKind.Defense,
+                    1,
+                    5))
+                .Concat(
+                    Enumerable.Range(0, 5)
+                        .Select(i => new CardDefinition(
+                            $"attack_{i}",
+                            CardKind.Attack,
+                            1,
+                            6)))
+                .ToArray();
+
+        var deck = new CardDeck(cards);
+
+        var combat = new CombatState(
+            new CombatantState(60),
+            new CombatantState(42));
+
+        var turn = new CombatTurnState(3);
+
+        var controller = new CombatTurnController(
+            combat,
+            deck,
+            turn,
+            new EnemyIntent(EnemyIntentKind.Attack, 12));
+
+        controller.StartCombat();
+
+        return controller;
+    }
+
+    private void RefreshBattleUi()
+    {
+        if (_combatController is null ||
+            _battleNameLabel is null ||
+            _battleInfoLabel is null)
+        {
+            return;
+        }
+
+        var combat = _combatController.Combat;
+        var turn = _combatController.Turn;
+        var intent = combat.CurrentEnemyIntent;
+
+        _battleNameLabel.Text = "FIRST ENGAGEMENT";
+
+        _battleInfoLabel.Text =
+            $"TURN {turn.TurnNumber} | " +
+            $"AP {turn.AvailableActionPoints}/{turn.MaxActionPoints} | " +
+            $"PLAYER {combat.Player.Health}/{combat.Player.MaxHealth} | " +
+            $"ENEMY {combat.Enemy.Health}/{combat.Enemy.MaxHealth} | " +
+            $"BLOCK {turn.Block} | " +
+            $"INTENT {intent?.Kind} {intent?.Amount}";
     }
 }
