@@ -38,7 +38,7 @@ internal sealed class GameMain : EngineGame
     private UiLabel? _battleNameLabel;
     private UiLabel? _battleInfoLabel;
     private FontHandle _uiFont;
-
+    private UiLabel? _battleResultLabel;
     private CombatPlayAreaDropTarget? _playAreaDropTarget;
 
     private float _handCardWidth;
@@ -148,7 +148,10 @@ internal sealed class GameMain : EngineGame
                 battleUiAsset,
                 _battleUiInstance,
                 "BattleInfo");
-
+            _battleResultLabel = FindLabel(
+                battleUiAsset,
+                _battleUiInstance,
+                "BattleResult");
             _combatController = CreateInitialCombat();
             CreatePlayAreaDropTarget(battleUiAsset);
             var cardAsset =
@@ -418,6 +421,7 @@ internal sealed class GameMain : EngineGame
                 .ToArray();
 
         var deck = new CardDeck(cards);
+        deck.ShuffleDrawPile();
 
         var combat = new CombatState(
             new CombatantState(60),
@@ -440,7 +444,8 @@ internal sealed class GameMain : EngineGame
     {
         if (_combatController is null ||
             _battleNameLabel is null ||
-            _battleInfoLabel is null)
+            _battleInfoLabel is null ||
+            _battleResultLabel is null)
         {
             return;
         }
@@ -458,5 +463,12 @@ internal sealed class GameMain : EngineGame
             $"ENEMY {combat.Enemy.Health}/{combat.Enemy.MaxHealth} | " +
             $"BLOCK {turn.Block} | " +
             $"INTENT {intent?.Kind} {intent?.Amount}";
+
+        _battleResultLabel.Text = combat.Result switch
+        {
+            CombatResult.PlayerVictory => "VICTORY",
+            CombatResult.PlayerDefeat => "DEFEAT",
+            _ => string.Empty
+        };
     }
 }

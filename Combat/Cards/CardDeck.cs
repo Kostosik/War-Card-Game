@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using Engine.Core.Math;
 
 namespace GameProject.Combat.Cards;
 
@@ -38,6 +39,17 @@ public sealed class CardDeck
         _handView = _hand.AsReadOnly();
 
         _random = random ?? Random.Shared;
+    }
+
+    public void ShuffleDrawPile()
+    {
+        for (var i = _drawPile.Count - 1; i > 0; i--)
+        {
+            var j = _random.Next(i + 1);
+
+            (_drawPile[i], _drawPile[j]) =
+                (_drawPile[j], _drawPile[i]);
+        }
     }
 
     public int DrawCards(int count)
