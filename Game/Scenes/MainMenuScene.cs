@@ -51,7 +51,7 @@ internal sealed class MainMenuScene : IGameScene
             context.Runtime.Events.Subscribe<StartGameRequestedEvent>(
                 _ =>
                 {
-                    _requestScene?.Invoke(new BattleScene());
+                    _requestScene?.Invoke(new HeadquartersScene());
                 });
 
         _ui.Root.AddChild(_menuInstance.Root);

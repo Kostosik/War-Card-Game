@@ -15,19 +15,26 @@ using GameProject.Combat.Combatants;
 using GameProject.Combat.Enemies;
 using GameProject.Combat.UI;
 using GameProject.Game.Flow;
+using GameProject.Game.Scenes.Modals;
 
 namespace GameProject.Game.Scenes;
 
 internal sealed class BattleScene : IGameScene
 {
     private sealed record EndTurnRequestedEvent : IEvent;
+    private sealed record ReturnToHeadquartersRequestedEvent : IEvent;
+    private Action<IGameScene>? _requestScene;
 
+    private bool _victoryModalShown;
     private GameSceneContext? _context;
     private UiSystem? _ui;
     private UiActionRuntime? _uiActions;
     private UiAssetInstance? _battleUiInstance;
     private EventSubscription? _endTurnSubscription;
+    private BattleVictoryModal? _victoryModal;
+    private BattleDefeatModal? _defeatModal;
 
+    private bool _resultModalShown;
     private CombatTurnController? _combatController;
 
     private UiLabel? _battleNameLabel;
@@ -50,6 +57,7 @@ internal sealed class BattleScene : IGameScene
         ArgumentNullException.ThrowIfNull(requestScene);
 
         _context = context;
+        _requestScene = requestScene;
 
         var ui = context.CreateUiSystem();
         _ui = ui;
@@ -62,9 +70,28 @@ internal sealed class BattleScene : IGameScene
             "EndTurn",
             () => new EndTurnRequestedEvent());
 
+        _uiActions.Register(
+    "ReturnToHeadquarters",
+    () => new ReturnToHeadquartersRequestedEvent());
+
         var battleUiAsset = context.Host.Content.Load<UiAsset>(
             new AssetPath("UI/BattleUI.ui"));
 
+        var victoryModalAsset = context.Host.Content.Load<UiAsset>(
+    new AssetPath("UI/BattleVictoryModal.ui"));
+
+
+        _victoryModal = new BattleVictoryModal(
+            context,
+            ui,
+            _uiActions,
+            _ => requestScene(new HeadquartersScene()));
+
+        _defeatModal = new BattleDefeatModal(
+            context,
+            ui,
+            _uiActions,
+            _ => requestScene(new HeadquartersScene()));
         _battleUiInstance = _uiActions.Load(battleUiAsset);
 
         _battleNameLabel = FindLabel(
@@ -140,6 +167,12 @@ internal sealed class BattleScene : IGameScene
 
         _handCardViews.Clear();
 
+
+        _victoryModal?.Dispose();
+        _victoryModal = null;
+
+        _defeatModal?.Dispose();
+        _defeatModal = null;
         _playAreaDropTarget = null;
         _battleUiInstance = null;
 
@@ -152,7 +185,9 @@ internal sealed class BattleScene : IGameScene
         _battleResultLabel = null;
         _ui = null;
         _context = null;
-
+        _victoryModal = null;
+        _requestScene = null;
+        _victoryModalShown = false;
         Console.WriteLine("Battle scene disposed.");
     }
 
@@ -372,5 +407,21 @@ internal sealed class BattleScene : IGameScene
             CombatResult.PlayerDefeat => "DEFEAT",
             _ => string.Empty
         };
+
+        if (!_resultModalShown)
+        {
+            switch (combat.Result)
+            {
+                case CombatResult.PlayerVictory:
+                    _resultModalShown = true;
+                    _victoryModal?.Show();
+                    break;
+
+                case CombatResult.PlayerDefeat:
+                    _resultModalShown = true;
+                    _defeatModal?.Show();
+                    break;
+            }
+        }
     }
 }
