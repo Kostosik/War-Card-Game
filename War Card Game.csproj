@@ -7,6 +7,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+	<ItemGroup>
+		<Compile Remove="Tests/**/*.cs" />
+	</ItemGroup>
+	
   <ItemGroup>
     <Reference Include="Engine.Animation">
       <HintPath>Engine\Engine.Animation.dll</HintPath>

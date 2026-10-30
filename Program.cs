@@ -17,7 +17,7 @@ internal static class Program
 
         DesktopGameHost.Run(
         (DesktopGameHostContext context) => new GameMain(
-            context.Runtime,
+            context,
             startupScenePath),
                 new DesktopGameHostOptions
                 {
