@@ -1,0 +1,6 @@
+{
+  "formatVersion": 1,
+  "name": "War Card Game",
+  "startupProject": "War Card Game.csproj",
+  "startupScene": "Scenes/Main.world"
+}
