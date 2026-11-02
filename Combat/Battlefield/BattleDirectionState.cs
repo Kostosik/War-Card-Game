@@ -45,6 +45,23 @@ public sealed class BattleDirectionState
         PlayerDetachment.ApplyDamage(damageDealtByEnemy);
     }
 
+    public DirectionControl Control
+    {
+        get
+        {
+            var playerReady = PlayerDetachment.IsCombatReady;
+            var enemyReady = EnemyDetachment.IsCombatReady;
+
+            if (playerReady && !enemyReady)
+                return DirectionControl.Player;
+
+            if (!playerReady && enemyReady)
+                return DirectionControl.Enemy;
+
+            return DirectionControl.None;
+        }
+    }
+
     public void ResolveStep()
     {
         if (IsFinished)
@@ -55,12 +72,10 @@ public sealed class BattleDirectionState
 
         // Сначала рассчитываем обе атаки.
         var playerDamage = DetachmentDamageCalculator.Calculate(
-            PlayerDetachment,
-            EnemyDetachment);
+            PlayerDetachment);
 
         var enemyDamage = DetachmentDamageCalculator.Calculate(
-            EnemyDetachment,
-            PlayerDetachment);
+            EnemyDetachment);
 
         // Затем одновременно применяем результат.
         ApplySimultaneousDamage(

@@ -120,6 +120,20 @@ internal sealed class BattleScene : IGameScene
 
         _battlefield = BattlefieldFactory.CreatePrototype();
 
+        _endTurnSubscription =
+    context.Runtime.Events.Subscribe<EndTurnRequestedEvent>(
+        _ =>
+        {
+            if (_battlefield is null || _battlefield.IsFinished)
+            {
+                return;
+            }
+
+            _battlefield.ResolveStep();
+
+            RefreshBattleUi();
+        });
+
         RefreshBattleUi();
 
         ui.Root.AddChild(_battleUiInstance.Root);
@@ -280,18 +294,19 @@ internal sealed class BattleScene : IGameScene
     BattleDirection direction,
     BattleDirectionState state)
     {
-        var control = state.PlayerDetachment.IsCombatReady &&
-                      !state.EnemyDetachment.IsCombatReady
-            ? "PLAYER"
-            : !state.PlayerDetachment.IsCombatReady &&
-              state.EnemyDetachment.IsCombatReady
-                ? "ENEMY"
-                : "NONE";
+        var status = state.IsFinished
+            ? state.Control switch
+            {
+                DirectionControl.Player => "CONTROLLED BY PLAYER",
+                DirectionControl.Enemy => "CONTROLLED BY ENEMY",
+                _ => "NO CONTROL"
+            }
+            : "BATTLE IN PROGRESS";
 
         return
             $"{direction}: " +
             $"PLAYER {state.PlayerDetachment.Health}/{state.PlayerDetachment.MaxHealth} | " +
             $"ENEMY {state.EnemyDetachment.Health}/{state.EnemyDetachment.MaxHealth} | " +
-            $"CONTROL: {control}";
+            status;
     }
 }

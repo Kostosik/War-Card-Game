@@ -2,38 +2,22 @@
 
 public sealed class DetachmentState
 {
-    public int PersonnelCount { get; }
+    public DetachmentDefinition Definition { get; }
 
-    public int MaxHealth { get; }
+    public int MaxHealth => Definition.MaxHealth;
 
     public int Health { get; private set; }
 
-    public int Attack { get; }
-
-    public int Defense { get; }
+    public int Attack => Definition.Attack;
 
     public bool IsCombatReady => Health > 0;
 
-    public DetachmentState(
-        int personnelCount,
-        int maxHealth,
-        int attack,
-        int defense)
+    public DetachmentState(DetachmentDefinition definition)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
-            personnelCount);
+        ArgumentNullException.ThrowIfNull(definition);
 
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
-            maxHealth);
-
-        ArgumentOutOfRangeException.ThrowIfNegative(attack);
-        ArgumentOutOfRangeException.ThrowIfNegative(defense);
-
-        PersonnelCount = personnelCount;
-        MaxHealth = maxHealth;
-        Health = maxHealth;
-        Attack = attack;
-        Defense = defense;
+        Definition = definition;
+        Health = definition.MaxHealth;
     }
 
     public int ApplyDamage(int damage)

@@ -93,16 +93,7 @@ public sealed class BattlefieldState
                 nameof(direction))
         };
 
-        var playerReady = state.PlayerDetachment.IsCombatReady;
-        var enemyReady = state.EnemyDetachment.IsCombatReady;
-
-        if (playerReady && !enemyReady)
-            return DirectionControl.Player;
-
-        if (!playerReady && enemyReady)
-            return DirectionControl.Enemy;
-
-        return DirectionControl.None;
+        return state.Control;
     }
 
     private void ResolveDirection(BattleDirectionState direction)

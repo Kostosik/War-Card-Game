@@ -12,6 +12,7 @@ namespace GameProject.Game.Scenes;
 
 internal sealed class MainMenuScene : IGameScene
 {
+    private sealed record ExitGameRequestedEvent : IEvent;
     private sealed record StartGameRequestedEvent : IEvent;
     private sealed record OpenSettingsRequestedEvent : IEvent;
     private GameSceneContext? _context;
@@ -20,7 +21,7 @@ internal sealed class MainMenuScene : IGameScene
     private UiSystem? _ui;
     private UiActionRuntime? _uiActions;
     private UiAssetInstance? _menuInstance;
-
+    private EventSubscription? _exitGameSubscription;
     private EventSubscription? _startGameSubscription;
     private EventSubscription? _openSettingsSubscription;
     public void Initialize(
@@ -38,7 +39,9 @@ internal sealed class MainMenuScene : IGameScene
         _uiActions = new UiActionRuntime(
             context.Runtime.Events,
             context.UiResources);
-
+        _uiActions.Register(
+            "ExitGame",
+            () => new ExitGameRequestedEvent());
         _uiActions.Register(
             "StartGame",
             () => new StartGameRequestedEvent());
@@ -49,7 +52,9 @@ internal sealed class MainMenuScene : IGameScene
             new AssetPath("UI/MainMenu.ui"));
 
         _menuInstance = _uiActions.Load(menuAsset);
-
+        _exitGameSubscription =
+    context.Runtime.Events.Subscribe<ExitGameRequestedEvent>(
+        _ => context.Host.Close());
         _startGameSubscription =
             context.Runtime.Events.Subscribe<StartGameRequestedEvent>(
                 _ =>
@@ -98,7 +103,8 @@ internal sealed class MainMenuScene : IGameScene
         _openSettingsSubscription = null;
         _uiActions?.Dispose();
         _uiActions = null;
-
+        _exitGameSubscription?.Dispose();
+        _exitGameSubscription = null;
         _menuInstance = null;
         _ui = null;
         _context = null;
