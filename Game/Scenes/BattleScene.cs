@@ -700,7 +700,7 @@ internal sealed class BattleScene : IGameScene
                 OperationOutcome.Defeat);
 
             _requestScene?.Invoke(
-                new HeadquartersScene(_campaign));
+                new OperationReportScene(_campaign, operation));
 
             return;
         }

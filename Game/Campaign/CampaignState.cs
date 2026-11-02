@@ -4,10 +4,15 @@ namespace GameProject.Game.Campaign;
 
 internal sealed class CampaignState
 {
-    public const int DefaultRegularOperationCount = 6;
+    public const int DefaultRegularOperationCount = 3;
 
     private readonly List<OperationState> _completedOperations = [];
+    private readonly List<string> _missedOpportunityIds = [];
 
+    public IReadOnlyList<string> MissedOpportunityIds =>
+    _missedOpportunityIds;
+
+    public OperationChoiceSet? PendingOperationChoices { get; private set; }
     public CampaignState(
         int regularOperationCount = DefaultRegularOperationCount)
     {
@@ -18,6 +23,22 @@ internal sealed class CampaignState
     }
 
     public int RegularOperationCount { get; }
+
+    public CampaignStage Stage { get; private set; } =
+        CampaignStage.RegularOperations;
+
+    public WarPositionLevel WarPosition { get; private set; } =
+        WarPositionLevel.Balance;
+
+    public string WarPositionDescription => WarPosition switch
+    {
+        WarPositionLevel.CriticalDefeat => "Критическое поражение",
+        WarPositionLevel.Retreat => "Отступление",
+        WarPositionLevel.Balance => "Равновесие",
+        WarPositionLevel.Advantage => "Преимущество",
+        WarPositionLevel.DecisiveAdvantage => "Решающее преимущество",
+        _ => throw new ArgumentOutOfRangeException()
+    };
 
     public int CompletedRegularOperations =>
         _completedOperations.Count;
@@ -36,9 +57,9 @@ internal sealed class CampaignState
             : CompletedRegularOperations + 1;
 
     public int? NextOperationNumber =>
-        AreRegularOperationsCompleted
-            ? null
-            : CompletedRegularOperations + 1;
+        Stage == CampaignStage.RegularOperations
+            ? CompletedRegularOperations + 1
+            : null;
 
     public IReadOnlyList<OperationState> OperationHistory =>
         _completedOperations;
@@ -54,13 +75,78 @@ internal sealed class CampaignState
                 "An operation is already in progress.");
         }
 
-        if (AreRegularOperationsCompleted)
+        if (Stage != CampaignStage.RegularOperations)
         {
             throw new InvalidOperationException(
-                "All regular operations have been completed.");
+                "Regular operations are no longer available.");
         }
 
         CurrentOperation = new OperationState(definition);
+
+        return CurrentOperation;
+    }
+
+    public void SetNextOperationChoices(OperationChoiceSet choices)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+
+        if (CurrentOperation is not null)
+            throw new InvalidOperationException(
+                "Cannot offer operations while another operation is active.");
+
+        if (Stage != CampaignStage.RegularOperations ||
+            CompletedRegularOperations == 0 ||
+            AreRegularOperationsCompleted)
+        {
+            throw new InvalidOperationException(
+                "Operation choices are not available at this campaign stage.");
+        }
+
+        if (PendingOperationChoices is not null)
+            throw new InvalidOperationException(
+                "Operation choices have already been offered.");
+
+        foreach (var offer in choices.Offers)
+        {
+            var id = offer.Operation.Id;
+
+            if (_completedOperations.Any(
+                    operation => operation.Definition.Id == id) ||
+                _missedOpportunityIds.Contains(id))
+            {
+                throw new InvalidOperationException(
+                    $"Operation '{id}' has already been resolved.");
+            }
+        }
+
+        PendingOperationChoices = choices;
+    }
+
+    public OperationState SelectNextOperation(string operationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+
+        if (CurrentOperation is not null)
+            throw new InvalidOperationException(
+                "An operation is already in progress.");
+
+        var choices = PendingOperationChoices
+            ?? throw new InvalidOperationException(
+                "There are no pending operation choices.");
+
+        var selected = choices.Offers.SingleOrDefault(
+            offer => offer.Operation.Id == operationId)
+            ?? throw new ArgumentException(
+                "Selected operation is not among the available choices.",
+                nameof(operationId));
+
+        var missed = choices.Offers.Single(
+            offer => offer.Operation.Id != operationId);
+
+        _missedOpportunityIds.Add(missed.Operation.Id);
+        PendingOperationChoices = null;
+
+        CurrentOperation = new OperationState(selected.Operation);
 
         return CurrentOperation;
     }
@@ -75,5 +161,26 @@ internal sealed class CampaignState
 
         _completedOperations.Add(operation);
         CurrentOperation = null;
+
+        if (AreRegularOperationsCompleted)
+        {
+            Stage = CampaignStage.FinalOperationAvailable;
+        }
+    }
+
+    public void AdjustWarPosition(int amount)
+    {
+        if (CurrentOperation is not null)
+        {
+            throw new InvalidOperationException(
+                "War position can only change between operations.");
+        }
+
+        var newValue = Math.Clamp(
+            (int)WarPosition + amount,
+            (int)WarPositionLevel.CriticalDefeat,
+            (int)WarPositionLevel.DecisiveAdvantage);
+
+        WarPosition = (WarPositionLevel)newValue;
     }
 }

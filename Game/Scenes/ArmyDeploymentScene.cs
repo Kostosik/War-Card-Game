@@ -20,7 +20,7 @@ internal sealed class ArmyDeploymentScene : IGameScene
     private UiLabel? _operationBriefingLabel;
     private readonly CampaignState _campaign;
     private readonly ArmyDeploymentState _deployment;
-
+    private readonly OperationDefinition _operation;
     private GameSceneContext? _context;
     private Action<IGameScene>? _requestScene;
     private UiSystem? _ui;
@@ -37,11 +37,15 @@ internal sealed class ArmyDeploymentScene : IGameScene
 
     private bool _restoringSelection;
 
-    public ArmyDeploymentScene(CampaignState campaign)
+    public ArmyDeploymentScene(
+        CampaignState campaign,
+        OperationDefinition? operation = null)
     {
         ArgumentNullException.ThrowIfNull(campaign);
 
         _campaign = campaign;
+        _operation = operation ?? OperationCatalog.FirstOperation;
+
         _deployment = new ArmyDeploymentState(
             DetachmentCatalog.CreateInitialRoster());
     }
@@ -77,7 +81,7 @@ internal sealed class ArmyDeploymentScene : IGameScene
             35,
             18);
 
-        var operation = OperationCatalog.FirstOperation;
+        var operation = _operation;
 
         _operationBriefingLabel = AddLabel(
             $"ОПЕРАЦИЯ: {operation.Name}\n" +
@@ -355,14 +359,19 @@ internal sealed class ArmyDeploymentScene : IGameScene
     private void StartBattle()
     {
         if (!_deployment.IsReadyForBattle ||
-            _campaign.CurrentOperation is not null ||
             _campaign.AreRegularOperationsCompleted)
         {
             return;
         }
 
-        _campaign.StartNextOperation(
-            OperationCatalog.FirstOperation);
+        if (_campaign.CurrentOperation is null)
+        {
+            _campaign.StartNextOperation(_operation);
+        }
+        else if (_campaign.CurrentOperation.Definition.Id != _operation.Id)
+        {
+            return;
+        }
 
         _requestScene?.Invoke(
             new BattleScene(_campaign, _deployment));
