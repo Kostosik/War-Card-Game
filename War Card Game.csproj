@@ -231,5 +231,7 @@
 
   <ItemGroup>
     <Folder Include="Assets\Fonts\" />
+    <Folder Include="Combat\Combatants\" />
+    <Folder Include="Combat\Enemies\" />
   </ItemGroup>
 </Project>

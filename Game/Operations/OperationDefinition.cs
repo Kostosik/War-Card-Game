@@ -10,7 +10,7 @@ internal sealed class OperationDefinition
     public string BattlePlan { get; }
 
     public const int BattleCount = 4;
-
+    public IReadOnlyList<string> AdditionalObjectiveDetachmentIds { get; }
     public IReadOnlyList<OperationBattleDefinition> Battles { get; }
 
     public OperationDefinition(
@@ -19,7 +19,7 @@ internal sealed class OperationDefinition
         string mainObjective,
         string additionalObjective,
         string enemyBriefing,
-        string battlePlan, IEnumerable<OperationBattleDefinition> battles)
+        string battlePlan, IEnumerable<OperationBattleDefinition> battles, IReadOnlyList<string> additionalObjectiveDetachmentIds)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -54,6 +54,7 @@ internal sealed class OperationDefinition
         AdditionalObjective = additionalObjective;
         EnemyBriefing = enemyBriefing;
         BattlePlan = battlePlan;
-        
+        AdditionalObjectiveDetachmentIds =
+    Array.AsReadOnly(additionalObjectiveDetachmentIds.ToArray());
     }
 }

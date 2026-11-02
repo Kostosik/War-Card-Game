@@ -1,6 +1,5 @@
 ﻿using GameProject.Combat.Army;
 using GameProject.Combat.Battlefield;
-using GameProject.Combat.Enemies;
 
 namespace GameProject.Game.Operations;
 
@@ -22,68 +21,77 @@ internal static class OperationCatalog
                     "Разведывательный дозор",
                     "Небольшие силы противника охраняют подступы.",
                     new EnemyBattlefieldDefinition(
-                        EnemyDetachmentCatalog.ReconInfantry,
-                        EnemyDetachmentCatalog.ScoutVehicles,
-                        EnemyDetachmentCatalog.MortarTeam)),
+                        DetachmentCatalog.Enemy.ReconInfantry,
+                        DetachmentCatalog.Enemy.ScoutVehicles,
+                        DetachmentCatalog.Enemy.MortarTeam)),
 
                 new OperationBattleDefinition(
                     "Укреплённый блокпост",
                     "Противник закрепился на дороге и усилил оборону.",
                     new EnemyBattlefieldDefinition(
-                        EnemyDetachmentCatalog.LineInfantry,
-                        EnemyDetachmentCatalog.MechanizedPatrol,
-                        EnemyDetachmentCatalog.MachineGunPosition)),
+                        DetachmentCatalog.Enemy.LineInfantry,
+                        DetachmentCatalog.Enemy.MechanizedPatrol,
+                        DetachmentCatalog.Enemy.MachineGunPosition)),
 
                 new OperationBattleDefinition(
                     "Контрудар подкрепления",
                     "К нефтяному узлу направлены механизированные " +
                     "и артиллерийские подразделения.",
                     new EnemyBattlefieldDefinition(
-                        EnemyDetachmentCatalog.AssaultInfantry,
-                        EnemyDetachmentCatalog.ArmoredCompany,
-                        EnemyDetachmentCatalog.FieldArtillery)),
+                        DetachmentCatalog.Enemy.AssaultInfantry,
+                        DetachmentCatalog.Enemy.ArmoredCompany,
+                        DetachmentCatalog.Enemy.FieldArtillery)),
 
                 new OperationBattleDefinition(
                     "Оборона нефтяного узла",
                     "Основные силы противника удерживают объект. " +
                     "Ожидается наиболее ожесточённое сопротивление.",
                     new EnemyBattlefieldDefinition(
-                        EnemyDetachmentCatalog.FortifiedInfantry,
-                        EnemyDetachmentCatalog.HeavyArmor,
-                        EnemyDetachmentCatalog.EntrenchedArtillery,
+                        DetachmentCatalog.Enemy.FortifiedInfantry,
+                        DetachmentCatalog.Enemy.HeavyArmor,
+                        DetachmentCatalog.Enemy.EntrenchedArtillery,
                         enemyIncomingDamageReductionPercent: 20))
+            },
+            new[]
+            {
+                DetachmentCatalog.Player.Infantry.Id
             });
+
     public static OperationDefinition IndustrialFacilityOperation { get; } =
-    new(
-        "industrial-facility",
-        "Захват промышленного объекта",
-        "Захватить промышленный комплекс и обеспечить его работу.",
-        "Сохранить пехотные подразделения.",
-        "Укреплённая пехота, бронегруппы и артиллерия.",
-        "Прорваться через внешнюю оборону и захватить промышленный комплекс.",
-        new[]
-        {
-            Battle("Внешний периметр", "Разведывательные силы противника.",
-                EnemyDetachmentCatalog.ReconInfantry,
-                EnemyDetachmentCatalog.ScoutVehicles,
-                EnemyDetachmentCatalog.MortarTeam),
+        new(
+            "industrial-facility",
+            "Захват промышленного объекта",
+            "Захватить промышленный комплекс и обеспечить его работу.",
+            "Сохранить пехотные подразделения.",
+            "Укреплённая пехота, бронегруппы и артиллерия.",
+            "Прорваться через внешнюю оборону и захватить промышленный комплекс.",
+            new[]
+            {
+                Battle("Внешний периметр", "Разведывательные силы противника.",
+                    DetachmentCatalog.Enemy.ReconInfantry,
+                    DetachmentCatalog.Enemy.ScoutVehicles,
+                    DetachmentCatalog.Enemy.MortarTeam),
 
-            Battle("Промышленная зона", "Объект прикрывают линейные части.",
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.MachineGunPosition,
-                EnemyDetachmentCatalog.MechanizedPatrol),
+                Battle("Промышленная зона", "Объект прикрывают линейные части.",
+                    DetachmentCatalog.Enemy.LineInfantry,
+                    DetachmentCatalog.Enemy.MachineGunPosition,
+                    DetachmentCatalog.Enemy.MechanizedPatrol),
 
-            Battle("Контратака", "Противник перебрасывает подкрепления.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.ArmoredCompany,
-                EnemyDetachmentCatalog.FieldArtillery),
+                Battle("Контратака", "Противник перебрасывает подкрепления.",
+                    DetachmentCatalog.Enemy.AssaultInfantry,
+                    DetachmentCatalog.Enemy.ArmoredCompany,
+                    DetachmentCatalog.Enemy.FieldArtillery),
 
-            Battle("Оборона комплекса", "Основные силы защищают объект.",
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                EnemyDetachmentCatalog.HeavyArmor,
-                EnemyDetachmentCatalog.EntrenchedArtillery,
-                15)
-        });
+                Battle("Оборона комплекса", "Основные силы защищают объект.",
+                    DetachmentCatalog.Enemy.FortifiedInfantry,
+                    DetachmentCatalog.Enemy.HeavyArmor,
+                    DetachmentCatalog.Enemy.EntrenchedArtillery,
+                    15)
+            },
+            new[]
+            {
+                DetachmentCatalog.Player.Infantry.Id
+            });
 
     public static OperationDefinition RiverCrossingOperation { get; } =
         new(
@@ -95,26 +103,30 @@ internal static class OperationCatalog
             "Укрепить позиции и отразить последовательные атаки.",
             new[]
             {
-            Battle("Подходы к реке", "Передовые силы противника.",
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.ReconInfantry,
-                EnemyDetachmentCatalog.MortarTeam),
+                Battle("Подходы к реке", "Передовые силы противника.",
+                    DetachmentCatalog.Enemy.LineInfantry,
+                    DetachmentCatalog.Enemy.ReconInfantry,
+                    DetachmentCatalog.Enemy.MortarTeam),
 
-            Battle("Плацдарм", "Противник пытается закрепиться у переправы.",
-                EnemyDetachmentCatalog.ScoutVehicles,
-                EnemyDetachmentCatalog.MechanizedPatrol,
-                EnemyDetachmentCatalog.MachineGunPosition),
+                Battle("Плацдарм", "Противник пытается закрепиться у переправы.",
+                    DetachmentCatalog.Enemy.ScoutVehicles,
+                    DetachmentCatalog.Enemy.MechanizedPatrol,
+                    DetachmentCatalog.Enemy.MachineGunPosition),
 
-            Battle("Подкрепления", "К переправе направлены дополнительные части.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.FieldArtillery,
-                EnemyDetachmentCatalog.ArmoredCompany),
+                Battle("Подкрепления", "К переправе направлены дополнительные части.",
+                    DetachmentCatalog.Enemy.AssaultInfantry,
+                    DetachmentCatalog.Enemy.FieldArtillery,
+                    DetachmentCatalog.Enemy.ArmoredCompany),
 
-            Battle("Решающий натиск", "Противник бросает основные силы.",
-                EnemyDetachmentCatalog.HeavyArmor,
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                EnemyDetachmentCatalog.EntrenchedArtillery,
-                10)
+                Battle("Решающий натиск", "Противник бросает основные силы.",
+                    DetachmentCatalog.Enemy.HeavyArmor,
+                    DetachmentCatalog.Enemy.FortifiedInfantry,
+                    DetachmentCatalog.Enemy.EntrenchedArtillery,
+                    10)
+            },
+            new[]
+            {
+                DetachmentCatalog.Player.Mechanized.Id
             });
 
     public static OperationDefinition ArtilleryHubOperation { get; } =
@@ -127,26 +139,30 @@ internal static class OperationCatalog
             "Прорваться через оборону и уничтожить артиллерийский узел.",
             new[]
             {
-            Battle("Передовые позиции", "Разведка и охрана батарей.",
-                EnemyDetachmentCatalog.ScoutVehicles,
-                EnemyDetachmentCatalog.ReconInfantry,
-                EnemyDetachmentCatalog.MortarTeam),
+                Battle("Передовые позиции", "Разведка и охрана батарей.",
+                    DetachmentCatalog.Enemy.ScoutVehicles,
+                    DetachmentCatalog.Enemy.ReconInfantry,
+                    DetachmentCatalog.Enemy.MortarTeam),
 
-            Battle("Линия обороны", "Основные силы охраняют подступы.",
-                EnemyDetachmentCatalog.MechanizedPatrol,
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.MachineGunPosition),
+                Battle("Линия обороны", "Основные силы охраняют подступы.",
+                    DetachmentCatalog.Enemy.MechanizedPatrol,
+                    DetachmentCatalog.Enemy.LineInfantry,
+                    DetachmentCatalog.Enemy.MachineGunPosition),
 
-            Battle("Резерв противника", "Противник пытается остановить наступление.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.ArmoredCompany,
-                EnemyDetachmentCatalog.EntrenchedArtillery),
+                Battle("Резерв противника", "Противник пытается остановить наступление.",
+                    DetachmentCatalog.Enemy.AssaultInfantry,
+                    DetachmentCatalog.Enemy.ArmoredCompany,
+                    DetachmentCatalog.Enemy.EntrenchedArtillery),
 
-            Battle("Артиллерийский узел", "Батареи прикрыты усиленной обороной.",
-                EnemyDetachmentCatalog.FieldArtillery,
-                EnemyDetachmentCatalog.HeavyArmor,
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                15)
+                Battle("Артиллерийский узел", "Батареи прикрыты усиленной обороной.",
+                    DetachmentCatalog.Enemy.FieldArtillery,
+                    DetachmentCatalog.Enemy.HeavyArmor,
+                    DetachmentCatalog.Enemy.FortifiedInfantry,
+                    15)
+            },
+            new[]
+            {
+                DetachmentCatalog.Player.Mechanized.Id
             });
 
     public static OperationDefinition SupplyRouteOperation { get; } =
@@ -159,35 +175,39 @@ internal static class OperationCatalog
             "Расчистить маршрут и удержать ключевые точки снабжения.",
             new[]
             {
-            Battle("Разведка маршрута", "На маршруте замечены дозоры.",
-                EnemyDetachmentCatalog.ReconInfantry,
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.ScoutVehicles),
+                Battle("Разведка маршрута", "На маршруте замечены дозоры.",
+                    DetachmentCatalog.Enemy.ReconInfantry,
+                    DetachmentCatalog.Enemy.LineInfantry,
+                    DetachmentCatalog.Enemy.ScoutVehicles),
 
-            Battle("Складской район", "Склады охраняют регулярные части.",
-                EnemyDetachmentCatalog.MortarTeam,
-                EnemyDetachmentCatalog.MachineGunPosition,
-                EnemyDetachmentCatalog.MechanizedPatrol),
+                Battle("Складской район", "Склады охраняют регулярные части.",
+                    DetachmentCatalog.Enemy.MortarTeam,
+                    DetachmentCatalog.Enemy.MachineGunPosition,
+                    DetachmentCatalog.Enemy.MechanizedPatrol),
 
-            Battle("Засада", "Противник атакует силы сопровождения.",
-                EnemyDetachmentCatalog.FieldArtillery,
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.ArmoredCompany),
+                Battle("Засада", "Противник атакует силы сопровождения.",
+                    DetachmentCatalog.Enemy.FieldArtillery,
+                    DetachmentCatalog.Enemy.AssaultInfantry,
+                    DetachmentCatalog.Enemy.ArmoredCompany),
 
-            Battle("Удержание маршрута", "Последняя попытка противника сорвать снабжение.",
-                EnemyDetachmentCatalog.EntrenchedArtillery,
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                EnemyDetachmentCatalog.HeavyArmor,
-                10)
+                Battle("Удержание маршрута", "Последняя попытка противника сорвать снабжение.",
+                    DetachmentCatalog.Enemy.EntrenchedArtillery,
+                    DetachmentCatalog.Enemy.FortifiedInfantry,
+                    DetachmentCatalog.Enemy.HeavyArmor,
+                    10)
+            },
+            new[]
+            {
+                DetachmentCatalog.Player.Infantry.Id
             });
 
     private static OperationBattleDefinition Battle(
-    string name,
-    string briefing,
-    DetachmentDefinition left,
-    DetachmentDefinition center,
-    DetachmentDefinition right,
-    int enemyDamageReduction = 0)
+        string name,
+        string briefing,
+        DetachmentDefinition left,
+        DetachmentDefinition center,
+        DetachmentDefinition right,
+        int enemyDamageReduction = 0)
     {
         return new OperationBattleDefinition(
             name,
@@ -199,16 +219,18 @@ internal static class OperationCatalog
                 enemyDamageReduction));
     }
 
+    public static IReadOnlyList<OperationDefinition> All { get; } =
+    Array.AsReadOnly(
+    [
+        FirstOperation,
+        IndustrialFacilityOperation,
+        RiverCrossingOperation,
+        ArtilleryHubOperation,
+        SupplyRouteOperation
+    ]);
+
     public static OperationDefinition? FindById(string id)
     {
-        return id switch
-        {
-            "oil-node" => FirstOperation,
-            "industrial-facility" => IndustrialFacilityOperation,
-            "river-crossing" => RiverCrossingOperation,
-            "artillery-hub" => ArtilleryHubOperation,
-            "supply-route" => SupplyRouteOperation,
-            _ => null
-        };
+        return All.FirstOrDefault(operation => operation.Id == id);
     }
 }

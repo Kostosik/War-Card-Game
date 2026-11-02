@@ -1,6 +1,5 @@
 ﻿using GameProject.Combat.Army;
 using GameProject.Combat.Battlefield;
-using GameProject.Combat.Enemies;
 using GameProject.Game.Campaign;
 
 namespace GameProject.Game.Operations;
@@ -47,7 +46,11 @@ internal static class FinalOperationCatalog
             briefing,
             "Прорваться через внешнюю оборону, уничтожить резервы " +
             "и захватить командный центр.",
-            battles);
+                        battles,
+            new[]
+            {
+                DetachmentCatalog.Player.Infantry.Id
+            });
     }
 
     private static OperationBattleDefinition[] CreateHardBattles()
@@ -57,33 +60,33 @@ internal static class FinalOperationCatalog
             Battle(
                 "Внешний периметр",
                 "Противник укрепил подступы к штабу.",
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.MechanizedPatrol,
-                EnemyDetachmentCatalog.MachineGunPosition,
+                DetachmentCatalog.Enemy.LineInfantry,
+                DetachmentCatalog.Enemy.MechanizedPatrol,
+                DetachmentCatalog.Enemy.MachineGunPosition,
                 5),
 
             Battle(
                 "Укреплённый рубеж",
                 "На пути наступления находятся бронетанковые части.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.ArmoredCompany,
-                EnemyDetachmentCatalog.FieldArtillery,
+                DetachmentCatalog.Enemy.AssaultInfantry,
+                DetachmentCatalog.Enemy.ArmoredCompany,
+                DetachmentCatalog.Enemy.FieldArtillery,
                 10),
 
             Battle(
                 "Резерв штаба",
                 "Противник бросает основные резервные силы.",
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                EnemyDetachmentCatalog.HeavyArmor,
-                EnemyDetachmentCatalog.FieldArtillery,
+                DetachmentCatalog.Enemy.FortifiedInfantry,
+                DetachmentCatalog.Enemy.HeavyArmor,
+                DetachmentCatalog.Enemy.FieldArtillery,
                 15),
 
             Battle(
                 "Командный центр",
                 "Последний рубеж обороны штаба.",
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                EnemyDetachmentCatalog.HeavyArmor,
-                EnemyDetachmentCatalog.EntrenchedArtillery,
+                DetachmentCatalog.Enemy.FortifiedInfantry,
+                DetachmentCatalog.Enemy.HeavyArmor,
+                DetachmentCatalog.Enemy.EntrenchedArtillery,
                 20)
         ];
     }
@@ -95,32 +98,32 @@ internal static class FinalOperationCatalog
             Battle(
                 "Внешний периметр",
                 "Разведывательные силы противника охраняют подступы.",
-                EnemyDetachmentCatalog.ReconInfantry,
-                EnemyDetachmentCatalog.ScoutVehicles,
-                EnemyDetachmentCatalog.MortarTeam),
+                DetachmentCatalog.Enemy.ReconInfantry,
+                DetachmentCatalog.Enemy.ScoutVehicles,
+                DetachmentCatalog.Enemy.MortarTeam),
 
             Battle(
                 "Укреплённый рубеж",
                 "Противник подготовил оборонительные позиции.",
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.MechanizedPatrol,
-                EnemyDetachmentCatalog.MachineGunPosition,
+                DetachmentCatalog.Enemy.LineInfantry,
+                DetachmentCatalog.Enemy.MechanizedPatrol,
+                DetachmentCatalog.Enemy.MachineGunPosition,
                 5),
 
             Battle(
                 "Резерв штаба",
                 "К месту сражения прибывают подкрепления.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.ArmoredCompany,
-                EnemyDetachmentCatalog.FieldArtillery,
+                DetachmentCatalog.Enemy.AssaultInfantry,
+                DetachmentCatalog.Enemy.ArmoredCompany,
+                DetachmentCatalog.Enemy.FieldArtillery,
                 5),
 
             Battle(
                 "Командный центр",
                 "Основные силы противника защищают штаб.",
-                EnemyDetachmentCatalog.FortifiedInfantry,
-                EnemyDetachmentCatalog.HeavyArmor,
-                EnemyDetachmentCatalog.EntrenchedArtillery,
+                DetachmentCatalog.Enemy.FortifiedInfantry,
+                DetachmentCatalog.Enemy.HeavyArmor,
+                DetachmentCatalog.Enemy.EntrenchedArtillery,
                 10)
         ];
     }
@@ -132,30 +135,30 @@ internal static class FinalOperationCatalog
             Battle(
                 "Внешний периметр",
                 "Разрозненные силы охраняют подступы.",
-                EnemyDetachmentCatalog.ReconInfantry,
-                EnemyDetachmentCatalog.ScoutVehicles,
-                EnemyDetachmentCatalog.MortarTeam),
+                DetachmentCatalog.Enemy.ReconInfantry,
+                DetachmentCatalog.Enemy.ScoutVehicles,
+                DetachmentCatalog.Enemy.MortarTeam),
 
             Battle(
                 "Укреплённый рубеж",
                 "Противник пытается организовать сопротивление.",
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.MechanizedPatrol,
-                EnemyDetachmentCatalog.MortarTeam),
+                DetachmentCatalog.Enemy.LineInfantry,
+                DetachmentCatalog.Enemy.MechanizedPatrol,
+                DetachmentCatalog.Enemy.MortarTeam),
 
             Battle(
                 "Резерв штаба",
                 "Оставшиеся силы противника пытаются остановить наступление.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.LineInfantry,
-                EnemyDetachmentCatalog.FieldArtillery),
+                DetachmentCatalog.Enemy.AssaultInfantry,
+                DetachmentCatalog.Enemy.LineInfantry,
+                DetachmentCatalog.Enemy.FieldArtillery),
 
             Battle(
                 "Командный центр",
                 "Последние защитники удерживают штаб.",
-                EnemyDetachmentCatalog.AssaultInfantry,
-                EnemyDetachmentCatalog.ArmoredCompany,
-                EnemyDetachmentCatalog.FieldArtillery)
+                DetachmentCatalog.Enemy.AssaultInfantry,
+                DetachmentCatalog.Enemy.ArmoredCompany,
+                DetachmentCatalog.Enemy.FieldArtillery)
         ];
     }
 

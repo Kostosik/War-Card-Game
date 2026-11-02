@@ -5,15 +5,6 @@ namespace GameProject.Combat.Battlefield;
 
 public static class BattlefieldFactory
 {
-    private static readonly DetachmentDefinition EnemyInfantry =
-        new("enemy-infantry", "Enemy Infantry", 100, 20);
-
-    private static readonly DetachmentDefinition EnemyMechanized =
-        new("enemy-mechanized", "Enemy Mechanized", 110, 22);
-
-    private static readonly DetachmentDefinition EnemyArtillery =
-        new("enemy-artillery", "Enemy Artillery", 100, 18);
-
     public static BattlefieldState CreatePrototype(
         ArmyDeploymentState deployment,
         EnemyBattlefieldDefinition enemyBattlefield)

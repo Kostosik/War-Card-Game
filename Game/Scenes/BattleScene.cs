@@ -341,17 +341,15 @@ internal sealed class BattleScene : IGameScene
     {
         var cards = new List<CardDefinition>();
 
-        // Пять копий каждой тактической карты.
-        for (var i = 0; i < 5; i++)
+        foreach (var card in TacticalCardCatalog.All)
         {
-            foreach (var card in TacticalCardCatalog.All)
+            for (var i = 0; i < card.CopiesInDeck; i++)
             {
                 cards.Add(card);
             }
         }
 
         var deck = new CardDeck(cards);
-
         deck.ShuffleDrawPile();
 
         return deck;
@@ -443,34 +441,17 @@ internal sealed class BattleScene : IGameScene
         if (handIndex < 0)
             return false;
 
+        var effect = card.Effect;
+
+        if (effect is null)
+            return false;
+
         if (_turn.AvailableActionPoints < card.ActionCost)
             return false;
 
         // Сначала проверяем и ставим эффект.
         // Если направление недоступно, карта не оплачивается.
-        switch (card.Kind)
-        {
-            case CardKind.ArtilleryStrike:
-                _battlefield.QueueArtilleryStrike(
-                    direction,
-                    card.Value);
-                break;
-
-            case CardKind.SmokeScreen:
-                _battlefield.QueueSmokeScreen(
-                    direction,
-                    card.Value);
-                break;
-
-            case CardKind.Supply:
-                _battlefield.QueueSupply(
-                    direction,
-                    card.Value);
-                break;
-
-            default:
-                return false;
-        }
+        effect(_battlefield, direction, card.Value);
 
         _turn.TrySpendActionPoints(card.ActionCost);
 

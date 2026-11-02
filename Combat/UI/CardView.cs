@@ -32,7 +32,10 @@ internal sealed class CardView : UiPanel, IUiDragSource
         Height = CardHeight;
 
         Padding = new UiThickness(8);
-        Background = GetBackground(definition.Kind);
+        Background = new UiColor(
+            definition.Appearance.Red,
+            definition.Appearance.Green,
+            definition.Appearance.Blue);
 
         _contentCanvas = new UiCanvas
         {
@@ -42,7 +45,7 @@ internal sealed class CardView : UiPanel, IUiDragSource
         AddChild(_contentCanvas);
 
         AddLabel(
-            GetTitle(definition.Kind),
+            definition.Title,
             0,
             5,
             126,
@@ -58,7 +61,7 @@ internal sealed class CardView : UiPanel, IUiDragSource
             13);
 
         AddLabel(
-            GetDescription(definition),
+            definition.Description,
             0,
             76,
             126,
@@ -145,60 +148,5 @@ internal sealed class CardView : UiPanel, IUiDragSource
         _contentCanvas.SetPosition(
             label,
             new Vector2(x, y));
-    }
-
-    private static string GetTitle(CardKind kind)
-    {
-        return kind switch
-        {
-            CardKind.ArtilleryStrike => "АРТИЛЛЕРИЯ",
-            CardKind.SmokeScreen => "ДЫМОВАЯ ЗАВЕСА",
-            CardKind.Supply => "СНАБЖЕНИЕ",
-            CardKind.Attack => "АТАКА",
-            CardKind.Defense => "ЗАЩИТА",
-            _ => kind.ToString()
-        };
-    }
-
-    private static string GetDescription(
-        CardDefinition definition)
-    {
-        return definition.Kind switch
-        {
-            CardKind.ArtilleryStrike =>
-                $"Наносит {definition.Value} дополнительного урона",
-
-            CardKind.SmokeScreen =>
-                $"Снижает урон противника на {definition.Value}%",
-
-            CardKind.Supply =>
-                $"Восстанавливает {definition.Value} здоровья",
-
-            CardKind.Attack =>
-                $"Наносит {definition.Value} урона",
-
-            CardKind.Defense =>
-                $"Защита: {definition.Value}",
-
-            _ => string.Empty
-        };
-    }
-
-    private static UiColor GetBackground(CardKind kind)
-    {
-        return kind switch
-        {
-            CardKind.ArtilleryStrike =>
-                new UiColor(110, 55, 45),
-
-            CardKind.SmokeScreen =>
-                new UiColor(55, 75, 95),
-
-            CardKind.Supply =>
-                new UiColor(55, 95, 65),
-
-            _ =>
-                new UiColor(55, 55, 65)
-        };
-    }
+    } 
 }
