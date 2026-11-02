@@ -31,17 +31,22 @@ internal sealed class BattleScene : IGameScene
     private EventSubscription? _endTurnSubscription;
     private BattleVictoryModal? _victoryModal;
     private BattleDefeatModal? _defeatModal;
-
+    private readonly ArmyDeploymentState _deployment;
     private bool _resultModalShown;
     private BattlefieldState? _battlefield;
 
     private UiLabel? _battleNameLabel;
     private UiLabel? _battleInfoLabel;
 
-    public BattleScene(CampaignState campaign)
+    public BattleScene(
+        CampaignState campaign,
+        ArmyDeploymentState deployment)
     {
         ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(deployment);
+
         _campaign = campaign;
+        _deployment = deployment;
     }
 
     public void Initialize(
@@ -118,7 +123,7 @@ internal sealed class BattleScene : IGameScene
             _battleUiInstance,
             "RightFlankInfo");
 
-        _battlefield = BattlefieldFactory.CreatePrototype();
+        _battlefield = BattlefieldFactory.CreatePrototype(_deployment);
 
         _endTurnSubscription =
     context.Runtime.Events.Subscribe<EndTurnRequestedEvent>(

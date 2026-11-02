@@ -79,10 +79,8 @@ internal sealed class HeadquartersScene : IGameScene
                         return;
                     }
 
-                    _campaign.StartNextOperation();
-
                     _requestScene?.Invoke(
-                        new BattleScene(_campaign));
+                        new ArmyDeploymentScene(_campaign));
                 });
 
         _ui.Root.AddChild(_headquartersInstance.Root);

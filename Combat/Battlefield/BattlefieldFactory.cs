@@ -1,41 +1,66 @@
-﻿using GameProject.Combat.Army;
+﻿
+using GameProject.Combat.Army;
 
 namespace GameProject.Combat.Battlefield;
 
 public static class BattlefieldFactory
 {
-    private static readonly DetachmentDefinition PlayerInfantry =
-        new("player-infantry", "Пехота", 100, 24);
-
     private static readonly DetachmentDefinition EnemyInfantry =
-        new("enemy-infantry", "Пехота противника", 100, 20);
-
-    private static readonly DetachmentDefinition PlayerMechanized =
-        new("player-mechanized", "Механизированные войска", 140, 20);
+        new("enemy-infantry", "Enemy Infantry", 100, 20);
 
     private static readonly DetachmentDefinition EnemyMechanized =
-        new("enemy-mechanized", "Механизированные войска противника", 110, 22);
-
-    private static readonly DetachmentDefinition PlayerArtillery =
-        new("player-artillery", "Артиллерия", 90, 28);
+        new("enemy-mechanized", "Enemy Mechanized", 110, 22);
 
     private static readonly DetachmentDefinition EnemyArtillery =
-        new("enemy-artillery", "Артиллерия противника", 100, 18);
+        new("enemy-artillery", "Enemy Artillery", 100, 18);
 
-    public static BattlefieldState CreatePrototype()
+    public static BattlefieldState CreatePrototype(
+    ArmyDeploymentState deployment)
     {
+        ArgumentNullException.ThrowIfNull(deployment);
+
+        if (!deployment.IsReadyForBattle)
+        {
+            throw new InvalidOperationException(
+                "Army deployment is incomplete.");
+        }
+
         return new BattlefieldState(
-            CreateDirection(PlayerInfantry, EnemyInfantry),
-            CreateDirection(PlayerMechanized, EnemyMechanized),
-            CreateDirection(PlayerArtillery, EnemyArtillery));
+            CreateDirection(
+                deployment.GetAssigned(BattleDirection.LeftFlank),
+                EnemyInfantry,
+                deployment.GetAssignedOrder(BattleDirection.LeftFlank)),
+
+            CreateDirection(
+                deployment.GetAssigned(BattleDirection.Center),
+                EnemyMechanized,
+                deployment.GetAssignedOrder(BattleDirection.Center)),
+
+            CreateDirection(
+                deployment.GetAssigned(BattleDirection.RightFlank),
+                EnemyArtillery,
+                deployment.GetAssignedOrder(BattleDirection.RightFlank)));
+    }
+
+    private static DetachmentDefinition GetAssigned(
+        ArmyDeploymentState deployment,
+        BattleDirection direction)
+    {
+        return deployment.GetAssigned(direction)
+            ?? throw new InvalidOperationException(
+                $"No detachment assigned to {direction}.");
     }
 
     private static BattleDirectionState CreateDirection(
         DetachmentDefinition player,
-        DetachmentDefinition enemy)
+        DetachmentDefinition enemy,
+        DetachmentOrderDefinition playerOrder)
     {
+        var playerDetachment = new DetachmentState(player);
+        playerDetachment.AssignOrder(playerOrder);
+
         return new BattleDirectionState(
-            new DetachmentState(player),
+            playerDetachment,
             new DetachmentState(enemy));
     }
 }

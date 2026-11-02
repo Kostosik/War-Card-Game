@@ -70,16 +70,17 @@ public sealed class BattleDirectionState
                 "Cannot advance a finished battle direction.");
         }
 
-        // Сначала рассчитываем обе атаки.
         var playerDamage = DetachmentDamageCalculator.Calculate(
             PlayerDetachment);
 
         var enemyDamage = DetachmentDamageCalculator.Calculate(
             EnemyDetachment);
 
-        // Затем одновременно применяем результат.
         ApplySimultaneousDamage(
             playerDamage,
             enemyDamage);
+
+        PlayerDetachment.ApplyEndOfRoundEffects();
+        EnemyDetachment.ApplyEndOfRoundEffects();
     }
 }

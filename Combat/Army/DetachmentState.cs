@@ -10,6 +10,8 @@ public sealed class DetachmentState
 
     public int Attack => Definition.Attack;
 
+    public DetachmentOrderDefinition? Order { get; private set; }
+
     public bool IsCombatReady => Health > 0;
 
     public DetachmentState(DetachmentDefinition definition)
@@ -20,19 +22,40 @@ public sealed class DetachmentState
         Health = definition.MaxHealth;
     }
 
+    public void AssignOrder(DetachmentOrderDefinition order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        Order = order;
+    }
+
     public int ApplyDamage(int damage)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(damage);
 
         if (!IsCombatReady || damage == 0)
-        {
             return 0;
-        }
 
-        var appliedDamage = Math.Min(damage, Health);
+        var modifiedDamage =
+            Order?.ModifyIncomingDamage(damage) ?? damage;
+
+        var appliedDamage = Math.Min(modifiedDamage, Health);
 
         Health -= appliedDamage;
 
         return appliedDamage;
+    }
+
+    public int ApplyEndOfRoundEffects()
+    {
+        if (!IsCombatReady)
+            return 0;
+
+        var healing = Order?.EndOfRoundHealing ?? 0;
+        var actualHealing = Math.Min(healing, MaxHealth - Health);
+
+        Health += actualHealing;
+
+        return actualHealing;
     }
 }

@@ -6,8 +6,10 @@ public static class DetachmentDamageCalculator
     {
         ArgumentNullException.ThrowIfNull(attacker);
 
-        return attacker.IsCombatReady
-            ? attacker.Attack
-            : 0;
+        if (!attacker.IsCombatReady)
+            return 0;
+
+        return attacker.Order?.ModifyOutgoingDamage(attacker.Attack)
+            ?? attacker.Attack;
     }
 }
