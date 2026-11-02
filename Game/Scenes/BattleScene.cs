@@ -357,8 +357,14 @@ internal sealed class BattleScene : IGameScene
 
     private void RefreshHandUi(int? viewportWidth = null)
     {
-        if (_handCanvas is null || _deck is null)
+        if (_handCanvas is null ||
+            _deck is null ||
+            _context is null)
+        {
             return;
+        }
+
+
 
         _handCanvas.ClearChildren();
 
@@ -395,7 +401,9 @@ internal sealed class BattleScene : IGameScene
 
         for (var i = 0; i < hand.Count; i++)
         {
-            var cardView = new CardView(hand[i])
+            var cardView = new CardView(
+                hand[i],
+                _context.UiResources)
             {
                 ZIndex = i
             };
@@ -652,9 +660,14 @@ internal sealed class BattleScene : IGameScene
             ?? throw new InvalidOperationException(
                 "There is no active operation.");
 
-        if (_deployment.GetDetachmentState("infantry").Health == 0)
+        foreach (var detachmentId in
+         operation.Definition.AdditionalObjectiveDetachmentIds)
         {
-            operation.FailAdditionalObjective();
+            if (!_deployment.GetDetachmentState(detachmentId).IsCombatReady)
+            {
+                operation.FailAdditionalObjective();
+                break;
+            }
         }
 
         if (result == CombatResult.PlayerVictory)

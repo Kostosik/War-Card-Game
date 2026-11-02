@@ -1,5 +1,6 @@
 ﻿using Engine.Core.Math;
 using Engine.Graphics.Commands;
+using Engine.Graphics.Resources;
 using Engine.UI.Controls;
 using Engine.UI.Core;
 using Engine.UI.Input;
@@ -22,9 +23,12 @@ internal sealed class CardView : UiPanel, IUiDragSource
 
     public CardDefinition Definition { get; }
 
-    public CardView(CardDefinition definition)
+    public CardView(
+    CardDefinition definition,
+    TextureResourceManager textureResources)
     {
         ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(textureResources);
 
         Definition = definition;
 
@@ -32,6 +36,7 @@ internal sealed class CardView : UiPanel, IUiDragSource
         Height = CardHeight;
 
         Padding = new UiThickness(8);
+
         Background = new UiColor(
             definition.Appearance.Red,
             definition.Appearance.Green,
@@ -44,29 +49,83 @@ internal sealed class CardView : UiPanel, IUiDragSource
 
         AddChild(_contentCanvas);
 
-        AddLabel(
-            definition.Title,
-            0,
-            5,
-            126,
-            32,
-            15);
+        if (definition.TexturePath is { } texturePath)
+        {
+            var texture = textureResources.Load(texturePath);
 
-        AddLabel(
-            $"{definition.ActionCost} AP",
-            0,
-            42,
-            126,
-            24,
-            13);
+            if (!textureResources.TryGetDescription(
+                    texturePath,
+                    out var description))
+            {
+                throw new InvalidOperationException(
+                    $"Could not get texture description: {texturePath}");
+            }
 
-        AddLabel(
-            definition.Description,
-            0,
-            76,
-            126,
-            80,
-            13);
+            var image = new UiImage(
+                texture,
+                new Vector2(description.Width, description.Height))
+            {
+                Width = 126,
+                Height = 58,
+                ZIndex = -1
+            };
+
+            _contentCanvas.AddChild(image);
+
+            _contentCanvas.SetPosition(
+                image,
+                Vector2.Zero);
+
+            AddLabel(
+                definition.Title,
+                0,
+                62,
+                126,
+                28,
+                13);
+
+            AddLabel(
+                $"{definition.ActionCost} AP",
+                0,
+                92,
+                126,
+                20,
+                12);
+
+            AddLabel(
+                definition.Description,
+                0,
+                116,
+                126,
+                46,
+                11);
+        }
+        else
+        {
+            AddLabel(
+                definition.Title,
+                0,
+                5,
+                126,
+                32,
+                15);
+
+            AddLabel(
+                $"{definition.ActionCost} AP",
+                0,
+                42,
+                126,
+                24,
+                13);
+
+            AddLabel(
+                definition.Description,
+                0,
+                76,
+                126,
+                80,
+                13);
+        }
     }
 
     public UiDragPayload? CreateDragPayload(

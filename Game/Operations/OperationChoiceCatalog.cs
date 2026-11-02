@@ -27,4 +27,15 @@ internal static class OperationChoiceCatalog
                 OperationCatalog.SupplyRouteOperation,
                 "Линия снабжения находится под угрозой засад.",
                 "Улучшение снабжения перед финальной операцией."));
+
+    public static OperationChoiceSet? GetAfterOperation(
+    int completedOperationCount)
+    {
+        return completedOperationCount switch
+        {
+            1 => AfterFirstOperation,
+            2 => AfterSecondOperation,
+            _ => null
+        };
+    }
 }

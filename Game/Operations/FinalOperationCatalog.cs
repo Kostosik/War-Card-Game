@@ -6,6 +6,8 @@ namespace GameProject.Game.Operations;
 
 internal static class FinalOperationCatalog
 {
+    public const string Id = "final-command-center";
+
     public static OperationDefinition Create(
         WarPositionLevel warPosition)
     {
@@ -38,7 +40,7 @@ internal static class FinalOperationCatalog
         };
 
         return new OperationDefinition(
-            "final-command-center",
+            Id,
             "Штурм командного штаба противника",
             "Захватить командный центр и сорвать управление " +
             "войсками противника.",

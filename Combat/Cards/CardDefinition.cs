@@ -1,4 +1,5 @@
-﻿using GameProject.Combat.Battlefield;
+﻿using Engine.Core.Assets;
+using GameProject.Combat.Battlefield;
 
 namespace GameProject.Combat.Cards;
 
@@ -24,6 +25,8 @@ public sealed record CardDefinition
 
     public CardAppearance Appearance { get; }
 
+    public AssetPath? TexturePath { get; }
+
     public CardEffect? Effect { get; }
 
     public CardDefinition(
@@ -34,7 +37,8 @@ public sealed record CardDefinition
         int value,
         int copiesInDeck,
         CardAppearance appearance,
-        CardEffect effect)
+        CardEffect effect,
+        AssetPath? texturePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
@@ -55,10 +59,10 @@ public sealed record CardDefinition
         CopiesInDeck = copiesInDeck;
         Appearance = appearance;
         Effect = effect;
+        TexturePath = texturePath;
     }
 
-    // Совместимость со старым конструктором,
-    // который используется существующими тестами колоды.
+    // Совместимость со старым конструктором.
     public CardDefinition(
         string id,
         CardKind kind,
@@ -80,5 +84,6 @@ public sealed record CardDefinition
         CopiesInDeck = 1;
         Appearance = new CardAppearance(55, 55, 65);
         Effect = null;
+        TexturePath = null;
     }
 }

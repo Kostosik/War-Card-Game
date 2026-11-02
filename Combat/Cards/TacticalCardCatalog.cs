@@ -13,6 +13,9 @@ public static class TacticalCardCatalog
             new CardAppearance(110, 55, 45),
             CardEffects.ArtilleryStrike);
 
+    //CardEffects.ArtilleryStrike,
+    //new AssetPath("Cards/ArtilleryStrike.png"));
+
     public static readonly CardDefinition SmokeScreen =
         new(
             "smoke-screen",

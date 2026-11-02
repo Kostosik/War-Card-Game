@@ -147,10 +147,13 @@ internal sealed class CampaignState
                 "Selected operation is not among the available choices.",
                 nameof(operationId));
 
-        var missed = choices.Offers.Single(
-            offer => offer.Operation.Id != operationId);
-
-        _missedOpportunityIds.Add(missed.Operation.Id);
+        foreach (var offer in choices.Offers)
+        {
+            if (offer.Operation.Id != operationId)
+            {
+                _missedOpportunityIds.Add(offer.Operation.Id);
+            }
+        }
         PendingOperationChoices = null;
 
         CurrentOperation = new OperationState(selected.Operation);
@@ -290,12 +293,8 @@ internal sealed class CampaignState
             campaign.CurrentOperation is null)
         {
             campaign.PendingOperationChoices =
-                campaign.CompletedRegularOperations switch
-                {
-                    1 => OperationChoiceCatalog.AfterFirstOperation,
-                    2 => OperationChoiceCatalog.AfterSecondOperation,
-                    _ => null
-                };
+                OperationChoiceCatalog.GetAfterOperation(
+                    campaign.CompletedRegularOperations);
         }
 
         return campaign;
@@ -322,7 +321,7 @@ internal sealed class CampaignState
 
         if (definition is null)
         {
-            if (data.DefinitionId != "final-command-center")
+            if (data.DefinitionId != FinalOperationCatalog.Id)
             {
                 throw new InvalidDataException(
                     $"Unknown operation ID: {data.DefinitionId}");

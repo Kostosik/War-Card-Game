@@ -227,12 +227,8 @@ internal sealed class HeadquartersScene : IGameScene
             return;
         }
 
-        var choices = _campaign.CompletedRegularOperations switch
-        {
-            1 => OperationChoiceCatalog.AfterFirstOperation,
-            2 => OperationChoiceCatalog.AfterSecondOperation,
-            _ => null
-        };
+        var choices = OperationChoiceCatalog.GetAfterOperation(
+            _campaign.CompletedRegularOperations);
 
         if (choices is not null)
         {
@@ -256,40 +252,49 @@ internal sealed class HeadquartersScene : IGameScene
 
         _choiceCanvas.AddChild(title);
 
-        for (var i = 0; i < choices.Offers.Count; i++)
+        if (choices.Offers.Count == 2)
         {
-            var offer = choices.Offers[i];
-            var offsetX = i == 0 ? -260 : 260;
-
-            var description = new UiLabel(
-                $"{offer.Operation.Name}\n\n" +
-                $"РИСК: {offer.RiskDescription}\n" +
-                $"ОЖИДАЕМЫЙ РЕЗУЛЬТАТ: {offer.ExpectedResult}")
+            for (var i = 0; i < choices.Offers.Count; i++)
             {
-                Width = 480,
-                Height = 140,
-                FontSize = 15,
-                LayoutMode = UiLayoutMode.Anchor,
-                Anchor = UiAnchor.Center,
-                Offset = new Vector2(offsetX, 0)
-            };
+                var offer = choices.Offers[i];
+                var offsetX = i == 0 ? -260 : 260;
 
-            _choiceCanvas.AddChild(description);
+                var description = new UiLabel(
+                    $"{offer.Operation.Name}\n\n" +
+                    $"РИСК: {offer.RiskDescription}\n" +
+                    $"ОЖИДАЕМЫЙ РЕЗУЛЬТАТ: {offer.ExpectedResult}")
+                {
+                    Width = 480,
+                    Height = 140,
+                    FontSize = 15,
+                    LayoutMode = UiLayoutMode.Anchor,
+                    Anchor = UiAnchor.Center,
+                    Offset = new Vector2(offsetX, 0)
+                };
 
-            var button = new UiButton("ВЫБРАТЬ ПРИКАЗ")
-            {
-                Width = 280,
-                Height = 52,
-                FontSize = 16,
-                LayoutMode = UiLayoutMode.Anchor,
-                Anchor = UiAnchor.Center,
-                Offset = new Vector2(offsetX, 125)
-            };
+                _choiceCanvas.AddChild(description);
 
-            button.Clicked += () => SelectOperation(offer);
+                var button = new UiButton("ВЫБРАТЬ ПРИКАЗ")
+                {
+                    Width = 280,
+                    Height = 52,
+                    FontSize = 16,
+                    LayoutMode = UiLayoutMode.Anchor,
+                    Anchor = UiAnchor.Center,
+                    Offset = new Vector2(offsetX, 125)
+                };
 
-            _choiceCanvas.AddChild(button);
+                button.Clicked += () => SelectOperation(offer);
+
+                _choiceCanvas.AddChild(button);
+            }
         }
+        else
+        {
+            BuildScrollableOperationChoices(choices);
+        }
+
+        _ui!.Root.AddChild(_choiceCanvas);
 
         _ui!.Root.AddChild(_choiceCanvas);
     }
@@ -324,6 +329,95 @@ internal sealed class HeadquartersScene : IGameScene
         return instance.Get(element.Id) as UiButton
             ?? throw new InvalidDataException(
                 $"UI element '{name}' is not a Button.");
+    }
+
+    private void BuildScrollableOperationChoices(
+    OperationChoiceSet choices)
+    {
+        var list = new UiList
+        {
+            Width = 1000,
+            Height = 430,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopCenter,
+            Offset = new Vector2(0, 235)
+        };
+
+        for (var i = 0; i < choices.Offers.Count; i += 2)
+        {
+            var row = new UiStackPanel
+            {
+                Orientation = UiOrientation.Horizontal,
+                Spacing = 40
+            };
+
+            var hasSecondOffer = i + 1 < choices.Offers.Count;
+
+            if (!hasSecondOffer)
+                row.AddChild(CreateChoiceSpacer());
+
+            row.AddChild(CreateOperationOfferPanel(choices.Offers[i]));
+
+            if (hasSecondOffer)
+            {
+                row.AddChild(
+                    CreateOperationOfferPanel(choices.Offers[i + 1]));
+            }
+            else
+            {
+                row.AddChild(CreateChoiceSpacer());
+            }
+
+            list.AddItem(row);
+        }
+
+        _choiceCanvas!.AddChild(list);
+    }
+
+    private UiStackPanel CreateOperationOfferPanel(
+        OperationOffer offer)
+    {
+        var panel = new UiStackPanel
+        {
+            Width = 480,
+            Orientation = UiOrientation.Vertical,
+            Spacing = 12
+        };
+
+        var description = new UiLabel(
+            $"{offer.Operation.Name}\n\n" +
+            $"РИСК: {offer.RiskDescription}\n" +
+            $"ОЖИДАЕМЫЙ РЕЗУЛЬТАТ: {offer.ExpectedResult}")
+        {
+            Width = 480,
+            Height = 140,
+            FontSize = 15
+        };
+
+        var button = new UiButton("ВЫБРАТЬ ПРИКАЗ")
+        {
+            Width = 280,
+            Height = 52,
+            FontSize = 16,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopCenter
+        };
+
+        button.Clicked += () => SelectOperation(offer);
+
+        panel.AddChild(description);
+        panel.AddChild(button);
+
+        return panel;
+    }
+
+    private static UiLabel CreateChoiceSpacer()
+    {
+        return new UiLabel(string.Empty)
+        {
+            Width = 220,
+            Height = 1
+        };
     }
 
     private static UiLabel FindLabel(

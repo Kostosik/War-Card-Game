@@ -25,19 +25,31 @@ internal sealed class OperationChoiceSet
 {
     public IReadOnlyList<OperationOffer> Offers { get; }
 
-    public OperationChoiceSet(
-        OperationOffer first,
-        OperationOffer second)
+    public OperationChoiceSet(params OperationOffer[] offers)
     {
-        ArgumentNullException.ThrowIfNull(first);
-        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(offers);
 
-        if (first.Operation.Id == second.Operation.Id)
+        if (offers.Length < 2)
         {
             throw new ArgumentException(
-                "Operation offers must be different.");
+                "At least two operation offers are required.",
+                nameof(offers));
         }
 
-        Offers = Array.AsReadOnly(new[] { first, second });
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var offer in offers)
+        {
+            ArgumentNullException.ThrowIfNull(offer);
+
+            if (!ids.Add(offer.Operation.Id))
+            {
+                throw new ArgumentException(
+                    "Operation offers must be different.",
+                    nameof(offers));
+            }
+        }
+
+        Offers = Array.AsReadOnly(offers.ToArray());
     }
 }
