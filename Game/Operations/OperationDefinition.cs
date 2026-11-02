@@ -9,13 +9,17 @@ internal sealed class OperationDefinition
     public string EnemyBriefing { get; }
     public string BattlePlan { get; }
 
+    public const int BattleCount = 4;
+
+    public IReadOnlyList<OperationBattleDefinition> Battles { get; }
+
     public OperationDefinition(
         string id,
         string name,
         string mainObjective,
         string additionalObjective,
         string enemyBriefing,
-        string battlePlan)
+        string battlePlan, IEnumerable<OperationBattleDefinition> battles)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -24,11 +28,32 @@ internal sealed class OperationDefinition
         ArgumentException.ThrowIfNullOrWhiteSpace(enemyBriefing);
         ArgumentException.ThrowIfNullOrWhiteSpace(battlePlan);
 
+        ArgumentNullException.ThrowIfNull(battles);
+
+        var battleArray = battles.ToArray();
+
+        if (battleArray.Length != BattleCount)
+        {
+            throw new ArgumentException(
+                $"An operation must contain exactly {BattleCount} battles.",
+                nameof(battles));
+        }
+
+        if (battleArray.Any(battle => battle is null))
+        {
+            throw new ArgumentException(
+                "Battle definitions cannot contain null entries.",
+                nameof(battles));
+        }
+
+        Battles = Array.AsReadOnly(battleArray);
+
         Id = id;
         Name = name;
         MainObjective = mainObjective;
         AdditionalObjective = additionalObjective;
         EnemyBriefing = enemyBriefing;
         BattlePlan = battlePlan;
+        
     }
 }

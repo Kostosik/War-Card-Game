@@ -60,6 +60,24 @@ public sealed class DetachmentState
         return restored;
     }
 
+    public int RecoverBetweenBattles(int missingHealthPercent)
+    {
+        if (missingHealthPercent is < 0 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(missingHealthPercent));
+        }
+
+        var missingHealth = MaxHealth - Health;
+
+        var recoveredHealth = (int)(
+            (long)missingHealth * missingHealthPercent / 100);
+
+        Health += recoveredHealth;
+
+        return recoveredHealth;
+    }
+
     public int ApplyEndOfRoundEffects()
     {
         if (!IsCombatReady)

@@ -76,11 +76,9 @@ internal sealed class BattleScene : IGameScene
         _context = context;
         _requestScene = requestScene;
 
-        if (_campaign.CurrentOperation is null)
-        {
-            throw new InvalidOperationException(
+        var operation = _campaign.CurrentOperation
+            ?? throw new InvalidOperationException(
                 "Battle cannot start without an active operation.");
-        }
 
         _ui = context.CreateUiSystem();
 
@@ -101,7 +99,8 @@ internal sealed class BattleScene : IGameScene
             ReturnToHeadquarters);
 
         _battlefield = BattlefieldFactory.CreatePrototype(
-            _deployment);
+            _deployment,
+            operation.CurrentBattle.EnemyForces);
 
         _deck = CreateDeck();
 
@@ -201,13 +200,18 @@ internal sealed class BattleScene : IGameScene
 
         _canvas.AddChild(_backgroundPanel);
 
+        var operation = _campaign.CurrentOperation
+            ?? throw new InvalidOperationException();
+
         AddAnchoredLabel(
-            $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} / {_campaign.RegularOperationCount}",
+            $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} / " +
+            $"{_campaign.RegularOperationCount} — " +
+            operation.CurrentBattle.Name,
             UiAnchor.TopCenter,
             new Vector2(0, 18),
-            600,
+            1000,
             36,
-            24);
+            22);
 
         _battleInfoLabel = AddAnchoredLabel(
             "",

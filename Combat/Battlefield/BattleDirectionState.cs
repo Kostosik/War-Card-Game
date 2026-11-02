@@ -8,6 +8,7 @@ public sealed class BattleDirectionState
     private int _pendingArtilleryDamage;
     private int _pendingSmokeReductionPercent;
     private int _pendingSupplyHealing;
+    public int EnemyIncomingDamageReductionPercent { get; }
     public DetachmentState EnemyDetachment { get; }
 
     public int PendingArtilleryDamage =>
@@ -25,13 +26,22 @@ public sealed class BattleDirectionState
 
     public BattleDirectionState(
         DetachmentState playerDetachment,
-        DetachmentState enemyDetachment)
+        DetachmentState enemyDetachment, int enemyIncomingDamageReductionPercent = 0)
     {
         ArgumentNullException.ThrowIfNull(playerDetachment);
         ArgumentNullException.ThrowIfNull(enemyDetachment);
 
         PlayerDetachment = playerDetachment;
         EnemyDetachment = enemyDetachment;
+
+        if (enemyIncomingDamageReductionPercent is < 0 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(enemyIncomingDamageReductionPercent));
+        }
+
+        EnemyIncomingDamageReductionPercent =
+            enemyIncomingDamageReductionPercent;
     }
 
     public void ApplySimultaneousDamage(
@@ -52,7 +62,11 @@ public sealed class BattleDirectionState
 
         // Обе стороны наносят урон,
         // даже если одна из них получит смертельный урон.
-        EnemyDetachment.ApplyDamage(damageDealtByPlayer);
+        var modifiedPlayerDamage = ScaleDamage(
+            damageDealtByPlayer,
+            100 - EnemyIncomingDamageReductionPercent);
+
+        EnemyDetachment.ApplyDamage(modifiedPlayerDamage);
         PlayerDetachment.ApplyDamage(damageDealtByEnemy);
     }
 

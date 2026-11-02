@@ -2,11 +2,12 @@
 
 internal sealed class OperationState
 {
-    public const int TotalBattleCount = 4;
+    public const int TotalBattleCount = OperationDefinition.BattleCount;
 
     private readonly List<string> _selectedCardIds = [];
     private readonly List<OperationBattleResult> _battleResults = [];
-
+    public OperationBattleDefinition CurrentBattle =>
+    Definition.Battles[CurrentBattleNumber - 1];
     public IReadOnlyList<string> SelectedCardIds => _selectedCardIds;
 
     public IReadOnlyList<OperationBattleResult> BattleResults =>

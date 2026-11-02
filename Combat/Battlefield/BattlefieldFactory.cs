@@ -15,9 +15,11 @@ public static class BattlefieldFactory
         new("enemy-artillery", "Enemy Artillery", 100, 18);
 
     public static BattlefieldState CreatePrototype(
-    ArmyDeploymentState deployment)
+        ArmyDeploymentState deployment,
+        EnemyBattlefieldDefinition enemyBattlefield)
     {
         ArgumentNullException.ThrowIfNull(deployment);
+        ArgumentNullException.ThrowIfNull(enemyBattlefield);
 
         if (!deployment.IsReadyForBattle)
         {
@@ -27,19 +29,19 @@ public static class BattlefieldFactory
 
         return new BattlefieldState(
             CreateDirection(
-                deployment.GetAssigned(BattleDirection.LeftFlank),
-                EnemyInfantry,
-                deployment.GetAssignedOrder(BattleDirection.LeftFlank)),
+                GetAssigned(deployment, BattleDirection.LeftFlank),
+                enemyBattlefield.LeftFlank,
+                deployment.GetAssignedOrder(BattleDirection.LeftFlank), enemyBattlefield.EnemyIncomingDamageReductionPercent),
 
             CreateDirection(
-                deployment.GetAssigned(BattleDirection.Center),
-                EnemyMechanized,
-                deployment.GetAssignedOrder(BattleDirection.Center)),
+                GetAssigned(deployment, BattleDirection.Center),
+                enemyBattlefield.Center,
+                deployment.GetAssignedOrder(BattleDirection.Center), enemyBattlefield.EnemyIncomingDamageReductionPercent),
 
             CreateDirection(
-                deployment.GetAssigned(BattleDirection.RightFlank),
-                EnemyArtillery,
-                deployment.GetAssignedOrder(BattleDirection.RightFlank)));
+                GetAssigned(deployment, BattleDirection.RightFlank),
+                enemyBattlefield.RightFlank,
+                deployment.GetAssignedOrder(BattleDirection.RightFlank), enemyBattlefield.EnemyIncomingDamageReductionPercent));
     }
 
     private static DetachmentDefinition GetAssigned(
@@ -54,13 +56,14 @@ public static class BattlefieldFactory
     private static BattleDirectionState CreateDirection(
         DetachmentDefinition player,
         DetachmentDefinition enemy,
-        DetachmentOrderDefinition playerOrder)
+        DetachmentOrderDefinition playerOrder, int enemyIncomingDamageReductionPercent)
     {
         var playerDetachment = new DetachmentState(player);
         playerDetachment.AssignOrder(playerOrder);
 
         return new BattleDirectionState(
             playerDetachment,
-            new DetachmentState(enemy));
+            new DetachmentState(enemy),
+            enemyIncomingDamageReductionPercent);
     }
 }

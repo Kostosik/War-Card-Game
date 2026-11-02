@@ -9,7 +9,7 @@ public sealed class ArmyDeploymentState
     private DetachmentDefinition? _leftFlank;
     private DetachmentDefinition? _center;
     private DetachmentDefinition? _rightFlank;
-
+    private readonly Dictionary<string, DetachmentState> _detachmentStates;
     private readonly Dictionary<BattleDirection, DetachmentOrderDefinition> _orders =
     new()
     {
@@ -55,6 +55,10 @@ public sealed class ArmyDeploymentState
         }
 
         _available = Array.AsReadOnly(definitions);
+        _detachmentStates = definitions.ToDictionary(
+    definition => definition.Id,
+    definition => new DetachmentState(definition),
+    StringComparer.Ordinal);
     }
 
     public bool TryAssignOrder(
@@ -71,6 +75,39 @@ public sealed class ArmyDeploymentState
 
         _orders[direction] = order;
         return true;
+    }
+
+    public DetachmentState GetAssignedState(BattleDirection direction)
+    {
+        var definition = GetAssigned(direction)
+            ?? throw new InvalidOperationException(
+                $"No detachment assigned to {direction}.");
+
+        return _detachmentStates[definition.Id];
+    }
+
+    public void RecoverBetweenBattles(int missingHealthPercent)
+    {
+        if (missingHealthPercent is < 0 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(missingHealthPercent));
+        }
+
+        RecoverAssigned(_leftFlank, missingHealthPercent);
+        RecoverAssigned(_center, missingHealthPercent);
+        RecoverAssigned(_rightFlank, missingHealthPercent);
+    }
+
+    private void RecoverAssigned(
+        DetachmentDefinition? definition,
+        int missingHealthPercent)
+    {
+        if (definition is null)
+            return;
+
+        _detachmentStates[definition.Id]
+            .RecoverBetweenBattles(missingHealthPercent);
     }
 
     public bool TryAssign(
