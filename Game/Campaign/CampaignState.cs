@@ -8,7 +8,8 @@ internal sealed class CampaignState
 
     private readonly List<OperationState> _completedOperations = [];
     private readonly List<string> _missedOpportunityIds = [];
-
+    public OperationState? FinalOperationResult { get; private set; }
+    public CampaignEvent? LatestEvent { get; private set; }
     public IReadOnlyList<string> MissedOpportunityIds =>
     _missedOpportunityIds;
 
@@ -73,6 +74,12 @@ internal sealed class CampaignState
         {
             throw new InvalidOperationException(
                 "An operation is already in progress.");
+        }
+
+        if (PendingOperationChoices is not null)
+        {
+            throw new InvalidOperationException(
+                "Select an offered operation before starting another one.");
         }
 
         if (Stage != CampaignStage.RegularOperations)
@@ -151,6 +158,21 @@ internal sealed class CampaignState
         return CurrentOperation;
     }
 
+    public OperationState StartFinalOperation(
+    OperationDefinition definition)
+    {
+        if (Stage != CampaignStage.FinalOperationAvailable)
+        {
+            throw new InvalidOperationException(
+                "Final operation is not available.");
+        }
+
+        CurrentOperation = new OperationState(definition);
+        Stage = CampaignStage.FinalOperation;
+
+        return CurrentOperation;
+    }
+
     public void CompleteCurrentOperation(OperationOutcome outcome)
     {
         var operation = CurrentOperation
@@ -161,6 +183,33 @@ internal sealed class CampaignState
 
         _completedOperations.Add(operation);
         CurrentOperation = null;
+
+        if (Stage == CampaignStage.FinalOperation)
+        {
+            FinalOperationResult = operation;
+            Stage = CampaignStage.Completed;
+            return;
+        }
+
+        var positionChange = outcome == OperationOutcome.Victory
+    ? 1
+    : -1;
+
+        if (outcome == OperationOutcome.Victory &&
+            !operation.HasFailedAdditionalObjective)
+        {
+            positionChange++;
+        }
+
+        AdjustWarPosition(positionChange);
+
+        LatestEvent = CampaignEventCatalog.GetAfterOperation(
+    CompletedRegularOperations);
+
+        if (LatestEvent is not null)
+        {
+            AdjustWarPosition(LatestEvent.WarPositionChange);
+        }
 
         if (AreRegularOperationsCompleted)
         {

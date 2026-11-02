@@ -76,6 +76,19 @@ internal sealed class HeadquartersScene : IGameScene
             context.Runtime.Events.Subscribe<StartOperationRequestedEvent>(
                 _ =>
                 {
+                    if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
+                    {
+                        var finalOperation = FinalOperationCatalog.Create(
+                            _campaign.WarPosition);
+
+                        _requestScene?.Invoke(
+                            new ArmyDeploymentScene(
+                                _campaign,
+                                finalOperation));
+
+                        return;
+                    }
+
                     if (_campaign.AreRegularOperationsCompleted)
                         return;
 
@@ -159,8 +172,29 @@ internal sealed class HeadquartersScene : IGameScene
             $"{_campaign.RegularOperationCount}\n" +
             $"Осталось операций: " +
             $"{_campaign.RemainingRegularOperations}";
-
+        _situationDescriptionLabel.Text +=
+    $"\nПоложение на войне: {_campaign.WarPositionDescription}";
         var choices = _campaign.PendingOperationChoices;
+
+        if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
+        {
+            _situationDescriptionLabel.Text +=
+                "\n\nФИНАЛЬНАЯ ОПЕРАЦИЯ ДОСТУПНА." +
+                "\nКомандование приказывает захватить штаб противника." +
+                $"\nПоложение на войне: {_campaign.WarPositionDescription}";
+
+            _startOperationButton.Enabled = true;
+
+            return;
+        }
+
+        if (_campaign.LatestEvent is { } campaignEvent)
+        {
+            _situationDescriptionLabel.Text +=
+                $"\n\nСОБЫТИЯ НА ДРУГИХ ФРОНТАХ\n" +
+                $"{campaignEvent.Title}\n" +
+                $"{campaignEvent.Description}";
+        }
 
         if (choices is not null)
         {

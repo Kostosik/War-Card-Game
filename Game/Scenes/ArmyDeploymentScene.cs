@@ -88,7 +88,9 @@ internal sealed class ArmyDeploymentScene : IGameScene
             $"ОСНОВНАЯ ЗАДАЧА: {operation.MainObjective}\n" +
             $"ДОПОЛНИТЕЛЬНОЕ УСЛОВИЕ: {operation.AdditionalObjective}\n" +
             $"РАЗВЕДКА: {operation.EnemyBriefing}\n" +
-            $"ПЛАН: {operation.BattlePlan}",
+            $"ПЛАН: {operation.BattlePlan}" + (_campaign.Stage == CampaignStage.FinalOperationAvailable
+    ? $"\nПОЛОЖЕНИЕ НА ВОЙНЕ: {_campaign.WarPositionDescription}"
+    : string.Empty),
 
             UiAnchor.TopCenter,
             new Vector2(0, 160),
@@ -358,15 +360,21 @@ internal sealed class ArmyDeploymentScene : IGameScene
 
     private void StartBattle()
     {
-        if (!_deployment.IsReadyForBattle ||
-            _campaign.AreRegularOperationsCompleted)
+        if (!_deployment.IsReadyForBattle)
         {
             return;
         }
 
         if (_campaign.CurrentOperation is null)
         {
-            _campaign.StartNextOperation(_operation);
+            if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
+            {
+                _campaign.StartFinalOperation(_operation);
+            }
+            else
+            {
+                _campaign.StartNextOperation(_operation);
+            }
         }
         else if (_campaign.CurrentOperation.Definition.Id != _operation.Id)
         {

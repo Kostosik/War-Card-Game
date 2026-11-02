@@ -68,7 +68,9 @@ internal sealed class OperationReportScene : IGameScene
         _canvas.AddChild(_backgroundPanel);
 
         AddLabel(
-            "ОТЧЁТ ОПЕРАЦИИ",
+            _campaign.Stage == CampaignStage.Completed
+                ? "ИТОГ КАМПАНИИ"
+                : "ОТЧЁТ ОПЕРАЦИИ",
             new Vector2(0, 55),
             700,
             50,
@@ -106,14 +108,22 @@ internal sealed class OperationReportScene : IGameScene
             75,
             17);
 
+        var campaignCompleted =
+            _campaign.Stage == CampaignStage.Completed;
+
         AddLabel(
-            BuildBattleResults(),
+            campaignCompleted
+                ? BuildBattleResults() + "\n\n" + BuildCampaignSummary()
+                : BuildBattleResults(),
             new Vector2(0, 445),
             950,
-            130,
-            17);
+            campaignCompleted ? 180 : 130,
+            campaignCompleted ? 14 : 17);
 
-        var backButton = new UiButton("ВЕРНУТЬСЯ В ШТАБ")
+        var backButton = new UiButton(
+            campaignCompleted
+                ? "В ГЛАВНОЕ МЕНЮ"
+                : "ВЕРНУТЬСЯ В ШТАБ")
         {
             Width = 260,
             Height = 50,
@@ -124,8 +134,12 @@ internal sealed class OperationReportScene : IGameScene
         };
 
         backButton.Clicked += () =>
+        {
             _requestScene?.Invoke(
-                new HeadquartersScene(_campaign));
+                campaignCompleted
+                    ? new MainMenuScene()
+                    : new HeadquartersScene(_campaign));
+        };
 
         _canvas.AddChild(backButton);
 
@@ -185,6 +199,15 @@ internal sealed class OperationReportScene : IGameScene
 
     private string GetOutcomeText()
     {
+        if (_campaign.Stage == CampaignStage.Completed)
+        {
+            return _operation.Outcome switch
+            {
+                OperationOutcome.Victory => "ПОБЕДА В ВОЙНЕ",
+                OperationOutcome.Defeat => "ПОРАЖЕНИЕ В ВОЙНЕ",
+                _ => "НЕИЗВЕСТНЫЙ РЕЗУЛЬТАТ"
+            };
+        }
         return _operation.Outcome switch
         {
             OperationOutcome.Victory => "ОПЕРАЦИЯ УСПЕШНО ЗАВЕРШЕНА",
@@ -193,6 +216,30 @@ internal sealed class OperationReportScene : IGameScene
             _ => throw new InvalidOperationException(
                 "Operation has no final outcome.")
         };
+    }
+
+    private string BuildCampaignSummary()
+    {
+        var successfulOperations = _campaign.OperationHistory.Count(
+            operation => operation.Outcome == OperationOutcome.Victory);
+
+        var completedAdditionalObjectives =
+            _campaign.OperationHistory.Count(
+                operation => !operation.HasFailedAdditionalObjective);
+
+        if (_campaign.FinalOperationResult is
+            { HasFailedAdditionalObjective: false })
+        {
+            completedAdditionalObjectives++;
+        }
+
+        return
+            $"ПОЛОЖЕНИЕ НА ВОЙНЕ: {_campaign.WarPositionDescription}\n" +
+            $"УСПЕШНЫХ ОБЫЧНЫХ ОПЕРАЦИЙ: " +
+            $"{successfulOperations}/{_campaign.RegularOperationCount}\n" +
+            $"ВЫПОЛНЕННЫХ ДОПОЛНИТЕЛЬНЫХ УСЛОВИЙ: " +
+            $"{completedAdditionalObjectives}/" +
+            $"{_campaign.RegularOperationCount + 1}";
     }
 
     private string GetMainObjectiveResult()

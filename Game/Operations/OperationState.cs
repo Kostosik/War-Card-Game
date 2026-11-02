@@ -108,6 +108,35 @@ internal sealed class OperationState
     public void Complete(OperationOutcome outcome)
     {
         EnsureNotCompleted();
+
+        switch (outcome)
+        {
+            case OperationOutcome.Victory:
+                if (CompletedBattleCount != TotalBattleCount ||
+                    WonBattleCount != TotalBattleCount)
+                {
+                    throw new InvalidOperationException(
+                        "An operation can only be won after all battles have been won.");
+                }
+
+                break;
+
+            case OperationOutcome.Defeat:
+                if (!_battleResults.Contains(OperationBattleResult.Defeat))
+                {
+                    throw new InvalidOperationException(
+                        "An operation can only be defeated after losing a battle.");
+                }
+
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(outcome),
+                    outcome,
+                    "Unknown operation outcome.");
+        }
+
         Outcome = outcome;
     }
 

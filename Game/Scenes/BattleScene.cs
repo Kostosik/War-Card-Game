@@ -203,10 +203,14 @@ internal sealed class BattleScene : IGameScene
         var operation = _campaign.CurrentOperation
             ?? throw new InvalidOperationException();
 
+        var operationTitle =
+            _campaign.Stage == CampaignStage.FinalOperation
+                ? "ФИНАЛЬНАЯ ОПЕРАЦИЯ"
+                : $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} / " +
+                  $"{_campaign.RegularOperationCount}";
+
         AddAnchoredLabel(
-            $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} / " +
-            $"{_campaign.RegularOperationCount} — " +
-            operation.CurrentBattle.Name,
+            $"{operationTitle} — {operation.CurrentBattle.Name}",
             UiAnchor.TopCenter,
             new Vector2(0, 18),
             1000,
@@ -536,8 +540,13 @@ internal sealed class BattleScene : IGameScene
             ?? throw new InvalidOperationException(
                 "There is no active operation.");
 
+        var operationTitle =
+    _campaign.Stage == CampaignStage.FinalOperation
+        ? "ФИНАЛЬНАЯ ОПЕРАЦИЯ"
+        : $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber}";
+
         _battleInfoLabel.Text =
-            $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} | " +
+            $"{operationTitle} | " +
             $"СРАЖЕНИЕ {operation.CurrentBattleNumber}/" +
             $"{OperationState.TotalBattleCount} | " +
             $"ХОД {_turn!.TurnNumber} | " +
@@ -678,7 +687,7 @@ internal sealed class BattleScene : IGameScene
                     OperationOutcome.Victory);
 
                 _requestScene?.Invoke(
-                    new HeadquartersScene(_campaign));
+                    new OperationReportScene(_campaign, operation));
 
                 return;
             }
