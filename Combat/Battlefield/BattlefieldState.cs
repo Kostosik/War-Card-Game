@@ -49,7 +49,10 @@ public sealed class BattlefieldState
 
     public int EnemyControlledDirections =>
         CountControlledDirections(DirectionControl.Enemy);
-
+    public bool AreAllDirectionsFinished =>
+    LeftFlank.IsFinished &&
+    Center.IsFinished &&
+    RightFlank.IsFinished;
     public BattlefieldResult Result
     {
         get
@@ -58,6 +61,12 @@ public sealed class BattlefieldState
                 return BattlefieldResult.PlayerVictory;
 
             if (EnemyControlledDirections >= 2)
+                return BattlefieldResult.PlayerDefeat;
+
+            // Все направления завершены, но игрок
+            // не смог захватить два направления.
+            // Победа остаётся за обороняющейся стороной.
+            if (AreAllDirectionsFinished)
                 return BattlefieldResult.PlayerDefeat;
 
             return BattlefieldResult.InProgress;

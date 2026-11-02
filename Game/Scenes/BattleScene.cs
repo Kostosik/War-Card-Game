@@ -20,7 +20,7 @@ internal sealed class BattleScene : IGameScene
 {
     private const int CardsPerTurn = 5;
     private const int ActionPointsPerTurn = 3;
-
+    private const int BetweenBattleRecoveryPercent = 50;
     private readonly CampaignState _campaign;
     private readonly ArmyDeploymentState _deployment;
 
@@ -632,6 +632,7 @@ internal sealed class BattleScene : IGameScene
 
             effects,
 
+            state.Control,
             state.IsFinished);
     }
 
@@ -661,6 +662,11 @@ internal sealed class BattleScene : IGameScene
             ?? throw new InvalidOperationException(
                 "There is no active operation.");
 
+        if (_deployment.GetDetachmentState("infantry").Health == 0)
+        {
+            operation.FailAdditionalObjective();
+        }
+
         if (result == CombatResult.PlayerVictory)
         {
             var operationCompleted =
@@ -677,6 +683,8 @@ internal sealed class BattleScene : IGameScene
                 return;
             }
 
+            _deployment.RecoverBetweenBattles(
+                 BetweenBattleRecoveryPercent);
             // Следующее сражение той же операции.
             _requestScene?.Invoke(
                 new BattleScene(_campaign, _deployment));

@@ -9,7 +9,7 @@ internal sealed class OperationState
     public OperationBattleDefinition CurrentBattle =>
     Definition.Battles[CurrentBattleNumber - 1];
     public IReadOnlyList<string> SelectedCardIds => _selectedCardIds;
-
+    public bool HasFailedAdditionalObjective { get; private set; }
     public IReadOnlyList<OperationBattleResult> BattleResults =>
         _battleResults;
 
@@ -59,6 +59,11 @@ internal sealed class OperationState
         _battleResults.Add(OperationBattleResult.Defeat);
     }
 
+    public void FailAdditionalObjective()
+    {
+        EnsureNotCompleted();
+        HasFailedAdditionalObjective = true;
+    }
     public void SetSelectedCards(IEnumerable<string> cardIds)
     {
         ArgumentNullException.ThrowIfNull(cardIds);

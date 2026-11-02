@@ -31,8 +31,16 @@ internal sealed class BattleDirectionDropTarget :
     private readonly UiColor _hoverColor =
         new(65, 100, 125);
 
-    private readonly UiColor _finishedColor =
-        new(45, 65, 50);
+    private readonly UiColor _playerControlledColor =
+        new(45, 75, 50);
+
+    private readonly UiColor _enemyControlledColor =
+        new(85, 45, 45);
+
+    private readonly UiColor _neutralFinishedColor =
+        new(65, 65, 70);
+
+    private DirectionControl _control = DirectionControl.None;
 
     public BattleDirection Direction { get; }
 
@@ -107,13 +115,13 @@ internal sealed class BattleDirectionDropTarget :
         string enemyInfo,
         string orderInfo,
         string effectsInfo,
-        bool finished)
+        DirectionControl control,bool finished)
     {
         _playerLabel.Text = playerInfo;
         _enemyLabel.Text = enemyInfo;
         _orderLabel.Text = orderInfo;
         _effectsLabel.Text = effectsInfo;
-
+        _control = control;
         _finished = finished;
         Enabled = !finished;
 
@@ -150,10 +158,20 @@ internal sealed class BattleDirectionDropTarget :
 
     private void UpdateBackground()
     {
-        Background = _finished
-            ? _finishedColor
-            : _dragHovered
+        if (!_finished)
+        {
+            Background = _dragHovered
                 ? _hoverColor
                 : _normalColor;
+
+            return;
+        }
+
+        Background = _control switch
+        {
+            DirectionControl.Player => _playerControlledColor,
+            DirectionControl.Enemy => _enemyControlledColor,
+            _ => _neutralFinishedColor
+        };
     }
 }

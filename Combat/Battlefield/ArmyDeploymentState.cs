@@ -99,6 +99,19 @@ public sealed class ArmyDeploymentState
         RecoverAssigned(_rightFlank, missingHealthPercent);
     }
 
+
+
+    public DetachmentState GetDetachmentState(string detachmentId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(detachmentId);
+
+        return _detachmentStates.TryGetValue(detachmentId, out var state)
+            ? state
+            : throw new ArgumentException(
+                $"Unknown detachment ID: {detachmentId}",
+                nameof(detachmentId));
+    }
+
     private void RecoverAssigned(
         DetachmentDefinition? definition,
         int missingHealthPercent)
