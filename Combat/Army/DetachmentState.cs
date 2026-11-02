@@ -46,6 +46,20 @@ public sealed class DetachmentState
         return appliedDamage;
     }
 
+    public int RestoreHealth(int amount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(amount);
+
+        if (!IsCombatReady || amount == 0)
+            return 0;
+
+        var restored = Math.Min(amount, MaxHealth - Health);
+
+        Health += restored;
+
+        return restored;
+    }
+
     public int ApplyEndOfRoundEffects()
     {
         if (!IsCombatReady)

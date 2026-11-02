@@ -1,42 +1,59 @@
-﻿
-using Engine.Core.Assets;
-using Engine.Core.Events;
+﻿using Engine.Core.Math;
 using Engine.Core.Time;
+using Engine.Graphics.Commands;
 using Engine.UI.Actions;
-using Engine.UI.Assets;
 using Engine.UI.Controls;
 using Engine.UI.Core;
+using Engine.UI.Layout;
 using GameProject.Combat;
+using GameProject.Combat.Battlefield;
+using GameProject.Combat.Cards;
+using GameProject.Combat.UI;
 using GameProject.Game.Campaign;
 using GameProject.Game.Flow;
 using GameProject.Game.Operations;
 using GameProject.Game.Scenes.Modals;
-using GameProject.Combat.Battlefield;
 
 namespace GameProject.Game.Scenes;
 
 internal sealed class BattleScene : IGameScene
 {
-    private sealed record EndTurnRequestedEvent : IEvent;
-    private sealed record ReturnToHeadquartersRequestedEvent : IEvent;
-    private Action<IGameScene>? _requestScene;
+    private const int CardsPerTurn = 5;
+    private const int ActionPointsPerTurn = 3;
+
     private readonly CampaignState _campaign;
-    private UiLabel? _leftFlankInfoLabel;
-    private UiLabel? _centerInfoLabel;
-    private UiLabel? _rightFlankInfoLabel;
+    private readonly ArmyDeploymentState _deployment;
+
     private GameSceneContext? _context;
+    private Action<IGameScene>? _requestScene;
+
     private UiSystem? _ui;
     private UiActionRuntime? _uiActions;
-    private UiAssetInstance? _battleUiInstance;
-    private EventSubscription? _endTurnSubscription;
+
+    private UiCanvas? _canvas;
+    private UiCanvas? _handCanvas;
+
+    private UiPanel? _backgroundPanel;
+    private UiPanel? _handBackground;
+
+    private UiLabel? _battleInfoLabel;
+    private UiLabel? _actionPointsLabel;
+    private UiLabel? _deckInfoLabel;
+
+    private UiButton? _endTurnButton;
+
+    private BattleDirectionDropTarget? _leftTarget;
+    private BattleDirectionDropTarget? _centerTarget;
+    private BattleDirectionDropTarget? _rightTarget;
+
+    private BattlefieldState? _battlefield;
+    private CardDeck? _deck;
+    private CombatTurnState? _turn;
+
     private BattleVictoryModal? _victoryModal;
     private BattleDefeatModal? _defeatModal;
-    private readonly ArmyDeploymentState _deployment;
-    private bool _resultModalShown;
-    private BattlefieldState? _battlefield;
 
-    private UiLabel? _battleNameLabel;
-    private UiLabel? _battleInfoLabel;
+    private bool _resultModalShown;
 
     public BattleScene(
         CampaignState campaign,
@@ -57,6 +74,7 @@ internal sealed class BattleScene : IGameScene
         ArgumentNullException.ThrowIfNull(requestScene);
 
         _context = context;
+        _requestScene = requestScene;
 
         if (_campaign.CurrentOperation is null)
         {
@@ -64,86 +82,42 @@ internal sealed class BattleScene : IGameScene
                 "Battle cannot start without an active operation.");
         }
 
-        _requestScene = requestScene;
-
-        var ui = context.CreateUiSystem();
-        _ui = ui;
+        _ui = context.CreateUiSystem();
 
         _uiActions = new UiActionRuntime(
             context.Runtime.Events,
             context.UiResources);
 
-        _uiActions.Register(
-            "EndTurn",
-            () => new EndTurnRequestedEvent());
-
-        _uiActions.Register(
-    "ReturnToHeadquarters",
-    () => new ReturnToHeadquartersRequestedEvent());
-
-        var battleUiAsset = context.Host.Content.Load<UiAsset>(
-            new AssetPath("UI/BattleUI.ui"));
-
         _victoryModal = new BattleVictoryModal(
             context,
-            ui,
+            _ui,
             _uiActions,
             ReturnToHeadquarters);
 
         _defeatModal = new BattleDefeatModal(
             context,
-            ui,
+            _ui,
             _uiActions,
             ReturnToHeadquarters);
 
-        _battleUiInstance = _uiActions.Load(battleUiAsset);
+        _battlefield = BattlefieldFactory.CreatePrototype(
+            _deployment);
 
-        _battleNameLabel = FindLabel(
-            battleUiAsset,
-            _battleUiInstance,
-            "BattleName");
+        _deck = CreateDeck();
 
-        _battleInfoLabel = FindLabel(
-            battleUiAsset,
-            _battleUiInstance,
-            "BattleInfo");
+        _turn = new CombatTurnState(
+            ActionPointsPerTurn);
 
-        _leftFlankInfoLabel = FindLabel(
-    battleUiAsset,
-    _battleUiInstance,
-    "LeftFlankInfo");
+        _turn.BeginTurn();
 
-        _centerInfoLabel = FindLabel(
-            battleUiAsset,
-            _battleUiInstance,
-            "CenterInfo");
+        _deck.DrawCards(CardsPerTurn);
 
-        _rightFlankInfoLabel = FindLabel(
-            battleUiAsset,
-            _battleUiInstance,
-            "RightFlankInfo");
-
-        _battlefield = BattlefieldFactory.CreatePrototype(_deployment);
-
-        _endTurnSubscription =
-    context.Runtime.Events.Subscribe<EndTurnRequestedEvent>(
-        _ =>
-        {
-            if (_battlefield is null || _battlefield.IsFinished)
-            {
-                return;
-            }
-
-            _battlefield.ResolveStep();
-
-            RefreshBattleUi();
-        });
+        BuildBattleUi();
 
         RefreshBattleUi();
+        RefreshHandUi(context.Host.WindowWidth);
 
-        ui.Root.AddChild(_battleUiInstance.Root);
-
-        context.Host.Resized += ui.Resize;
+        context.Host.Resized += OnHostResized;
 
         Console.WriteLine("Battle scene initialized.");
     }
@@ -151,8 +125,6 @@ internal sealed class BattleScene : IGameScene
     public void Update(TimeSnapshot time)
     {
         _ui?.Update(time.Delta.TotalSeconds);
-
-        RefreshBattleUi();
     }
 
     public void Render(double interpolationAlpha)
@@ -162,126 +134,438 @@ internal sealed class BattleScene : IGameScene
 
     public void Dispose()
     {
-        _endTurnSubscription?.Dispose();
-        _endTurnSubscription = null;
-
-        if (_context is not null && _ui is not null)
+        if (_context is not null)
         {
-            _context.Host.Resized -= _ui.Resize;
-
-            if (_battleUiInstance is not null)
-            {
-                _ui.Root.RemoveChild(_battleUiInstance.Root);
-            }
+            _context.Host.Resized -= OnHostResized;
         }
-
 
         _victoryModal?.Dispose();
         _victoryModal = null;
 
         _defeatModal?.Dispose();
         _defeatModal = null;
-        _battleUiInstance = null;
+
+        if (_ui is not null && _canvas is not null)
+        {
+            _ui.Root.RemoveChild(_canvas);
+        }
 
         _uiActions?.Dispose();
         _uiActions = null;
-        _leftFlankInfoLabel = null;
-        _centerInfoLabel = null;
-        _rightFlankInfoLabel = null;
-        _battleNameLabel = null;
+
+        _leftTarget = null;
+        _centerTarget = null;
+        _rightTarget = null;
+
+        _battlefield = null;
+        _deck = null;
+        _turn = null;
+
+        _handCanvas = null;
+        _canvas = null;
+
+        _backgroundPanel = null;
+        _handBackground = null;
+
         _battleInfoLabel = null;
+        _actionPointsLabel = null;
+        _deckInfoLabel = null;
+
+        _endTurnButton = null;
+
         _ui = null;
         _context = null;
-        _victoryModal = null;
         _requestScene = null;
-        _battlefield = null;
+
         Console.WriteLine("Battle scene disposed.");
     }
 
-    
-    private void ReturnToHeadquarters(CombatResult result)
+    private void BuildBattleUi()
     {
-        var outcome = result switch
-        {
-            CombatResult.PlayerVictory => OperationOutcome.Victory,
-            CombatResult.PlayerDefeat => OperationOutcome.Defeat,
+        var context = _context
+            ?? throw new InvalidOperationException();
 
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(result),
-                result,
-                "Cannot complete an operation with an unfinished combat.")
+        _canvas = new UiCanvas();
+
+        _ui!.Root.AddChild(_canvas);
+
+        _backgroundPanel = new UiPanel
+        {
+            Width = context.Host.WindowWidth,
+            Height = context.Host.WindowHeight,
+            Background = new UiColor(18, 22, 30),
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopLeft,
+            ZIndex = -100
         };
 
-        _campaign.CompleteCurrentOperation(outcome);
+        _canvas.AddChild(_backgroundPanel);
 
-        _requestScene?.Invoke(
-            new HeadquartersScene(_campaign));
+        AddAnchoredLabel(
+            $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} / {_campaign.RegularOperationCount}",
+            UiAnchor.TopCenter,
+            new Vector2(0, 18),
+            600,
+            36,
+            24);
+
+        _battleInfoLabel = AddAnchoredLabel(
+            "",
+            UiAnchor.TopCenter,
+            new Vector2(0, 60),
+            900,
+            30,
+            16);
+
+        _actionPointsLabel = AddAnchoredLabel(
+            "",
+            UiAnchor.TopLeft,
+            new Vector2(24, 65),
+            260,
+            30,
+            16);
+
+        _deckInfoLabel = AddAnchoredLabel(
+            "",
+            UiAnchor.TopRight,
+            new Vector2(-24, 65),
+            260,
+            30,
+            16);
+
+        _leftTarget = CreateDirectionTarget(
+            BattleDirection.LeftFlank,
+            "ЛЕВЫЙ ФЛАНГ",
+            -370);
+
+        _centerTarget = CreateDirectionTarget(
+            BattleDirection.Center,
+            "ЦЕНТР",
+            0);
+
+        _rightTarget = CreateDirectionTarget(
+            BattleDirection.RightFlank,
+            "ПРАВЫЙ ФЛАНГ",
+            370);
+
+        _handBackground = new UiPanel
+        {
+            Width = context.Host.WindowWidth,
+            Height = 195,
+            Background = new UiColor(27, 32, 42),
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.BottomCenter,
+            ZIndex = -10
+        };
+
+        _canvas.AddChild(_handBackground);
+
+        _handCanvas = new UiCanvas
+        {
+            Height = 190,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.BottomCenter
+        };
+
+        _canvas.AddChild(_handCanvas);
+
+        _endTurnButton = new UiButton("ЗАВЕРШИТЬ ХОД")
+        {
+            Width = 190,
+            Height = 46,
+            FontSize = 16,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.BottomRight,
+            Offset = new Vector2(-24, -210)
+        };
+
+        _endTurnButton.Clicked += EndTurn;
+
+        _canvas.AddChild(_endTurnButton);
     }
 
-    
-
-   
-    
-
-    private static UiLabel FindLabel(
-        UiAsset asset,
-        UiAssetInstance instance,
-        string name)
+    private BattleDirectionDropTarget CreateDirectionTarget(
+        BattleDirection direction,
+        string title,
+        float offsetX)
     {
-        var element = asset.Elements.SingleOrDefault(
-            element => element.Name == name)
-            ?? throw new InvalidDataException(
-                $"UI label '{name}' was not found.");
+        var target = new BattleDirectionDropTarget(
+            direction,
+            title,
+            TryPlayCard)
+        {
+            Width = 350,
+            Height = 320,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopCenter,
+            Offset = new Vector2(offsetX, 120)
+        };
 
-        return instance.Get(element.Id) as UiLabel
-            ?? throw new InvalidDataException(
-                $"UI element '{name}' is not a Label.");
+        _canvas!.AddChild(target);
+
+        return target;
     }
 
+    private UiLabel AddAnchoredLabel(
+        string text,
+        UiAnchor anchor,
+        Vector2 offset,
+        float width,
+        float height,
+        float fontSize)
+    {
+        var label = new UiLabel(text)
+        {
+            Width = width,
+            Height = height,
+            FontSize = fontSize,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = anchor,
+            Offset = offset
+        };
 
+        _canvas!.AddChild(label);
 
-    private void RefreshBattleUi()
+        return label;
+    }
+
+    private static CardDeck CreateDeck()
+    {
+        var cards = new List<CardDefinition>();
+
+        // Пять копий каждой тактической карты.
+        for (var i = 0; i < 5; i++)
+        {
+            foreach (var card in TacticalCardCatalog.All)
+            {
+                cards.Add(card);
+            }
+        }
+
+        var deck = new CardDeck(cards);
+
+        deck.ShuffleDrawPile();
+
+        return deck;
+    }
+
+    private void RefreshHandUi(int? viewportWidth = null)
+    {
+        if (_handCanvas is null || _deck is null)
+            return;
+
+        _handCanvas.ClearChildren();
+
+        var hand = _deck.Hand;
+        var width = viewportWidth ??
+            _context?.Host.WindowWidth ?? 1280;
+
+        if (hand.Count == 0)
+        {
+            var emptyLabel = new UiLabel("НЕТ КАРТ В РУКЕ")
+            {
+                Width = 300,
+                Height = 40,
+                FontSize = 16,
+                LayoutMode = UiLayoutMode.Anchor,
+                Anchor = UiAnchor.Center
+            };
+
+            _handCanvas.AddChild(emptyLabel);
+
+            return;
+        }
+
+        const float cardWidth = 142;
+        const float cardSpacing = 12;
+
+        var totalWidth =
+            hand.Count * cardWidth +
+            (hand.Count - 1) * cardSpacing;
+
+        var startX = Math.Max(
+            12,
+            (width - totalWidth) / 2);
+
+        for (var i = 0; i < hand.Count; i++)
+        {
+            var cardView = new CardView(hand[i])
+            {
+                ZIndex = i
+            };
+
+            _handCanvas.AddChild(cardView);
+
+            _handCanvas.SetPosition(
+                cardView,
+                new Vector2(
+                    startX + i * (cardWidth + cardSpacing),
+                    5));
+        }
+    }
+
+    private bool TryPlayCard(
+        BattleDirection direction,
+        CardDefinition card)
     {
         if (_battlefield is null ||
-            _battleNameLabel is null ||
-            _battleInfoLabel is null ||
-            _leftFlankInfoLabel is null ||
-            _centerInfoLabel is null ||
-            _rightFlankInfoLabel is null)
+            _deck is null ||
+            _turn is null ||
+            _battlefield.IsFinished)
+        {
+            return false;
+        }
+
+        var directionState = GetDirectionState(direction);
+
+        if (directionState.IsFinished)
+            return false;
+
+        var handIndex = -1;
+
+        for (var i = 0; i < _deck.Hand.Count; i++)
+        {
+            if (_deck.Hand[i].Id == card.Id)
+            {
+                handIndex = i;
+                break;
+            }
+        }
+
+        if (handIndex < 0)
+            return false;
+
+        if (_turn.AvailableActionPoints < card.ActionCost)
+            return false;
+
+        // Сначала проверяем и ставим эффект.
+        // Если направление недоступно, карта не оплачивается.
+        switch (card.Kind)
+        {
+            case CardKind.ArtilleryStrike:
+                _battlefield.QueueArtilleryStrike(
+                    direction,
+                    card.Value);
+                break;
+
+            case CardKind.SmokeScreen:
+                _battlefield.QueueSmokeScreen(
+                    direction,
+                    card.Value);
+                break;
+
+            case CardKind.Supply:
+                _battlefield.QueueSupply(
+                    direction,
+                    card.Value);
+                break;
+
+            default:
+                return false;
+        }
+
+        _turn.TrySpendActionPoints(card.ActionCost);
+
+        _deck.DiscardFromHand(handIndex);
+
+        RefreshHandUi();
+        RefreshBattleUi();
+
+        return true;
+    }
+
+    private void EndTurn()
+    {
+        if (_battlefield is null ||
+            _deck is null ||
+            _turn is null ||
+            _battlefield.IsFinished)
         {
             return;
         }
 
-        var battlefield = _battlefield;
+        // Неиспользованные карты уходят в сброс.
+        _deck.DiscardHand();
 
-        _battleNameLabel.Text =
-            $"OPERATION {_campaign.CurrentOperationNumber} / " +
-            $"{_campaign.RegularOperationCount}";
+        // Разрешаем один боевой раунд на всех направлениях.
+        _battlefield.ResolveStep();
+
+        // Новый ход начинается только если бой продолжается.
+        if (!_battlefield.IsFinished)
+        {
+            _turn.BeginTurn();
+            _deck.DrawCards(CardsPerTurn);
+        }
+
+        RefreshHandUi();
+        RefreshBattleUi();
+    }
+
+    private BattleDirectionState GetDirectionState(
+        BattleDirection direction)
+    {
+        return direction switch
+        {
+            BattleDirection.LeftFlank =>
+                _battlefield!.LeftFlank,
+
+            BattleDirection.Center =>
+                _battlefield!.Center,
+
+            BattleDirection.RightFlank =>
+                _battlefield!.RightFlank,
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(direction))
+        };
+    }
+
+    private void RefreshBattleUi()
+    {
+        if (_battlefield is null ||
+            _turn is null)
+        {
+            return;
+        }
+
+        var operation = _campaign.CurrentOperation
+            ?? throw new InvalidOperationException(
+                "There is no active operation.");
 
         _battleInfoLabel.Text =
-            $"STEP {battlefield.StepNumber} | " +
-            $"CONTROL: PLAYER {battlefield.PlayerControlledDirections}/2 | " +
-            $"ENEMY {battlefield.EnemyControlledDirections}/2";
+            $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber} | " +
+            $"СРАЖЕНИЕ {operation.CurrentBattleNumber}/" +
+            $"{OperationState.TotalBattleCount} | " +
+            $"ХОД {_turn!.TurnNumber} | " +
+            $"КОНТРОЛЬ: ИГРОК {_battlefield.PlayerControlledDirections}/2 | " +
+            $"ПРОТИВНИК {_battlefield.EnemyControlledDirections}/2";
 
-        _leftFlankInfoLabel.Text =
-    FormatDirection(
-        BattleDirection.LeftFlank,
-        battlefield.LeftFlank);
+        _actionPointsLabel!.Text =
+            $"ОЧКИ ДЕЙСТВИЙ: " +
+            $"{_turn.AvailableActionPoints}/{_turn.MaxActionPoints}";
 
-        _centerInfoLabel.Text =
-            FormatDirection(
-                BattleDirection.Center,
-                battlefield.Center);
+        _deckInfoLabel!.Text =
+            $"КОЛОДА: {_deck!.DrawPileCount} | " +
+            $"СБРОС: {_deck.DiscardPileCount}";
 
-        _rightFlankInfoLabel.Text =
-            FormatDirection(
-                BattleDirection.RightFlank,
-                battlefield.RightFlank);
+        RefreshDirectionTarget(
+            _leftTarget!,
+            _battlefield.LeftFlank);
+
+        RefreshDirectionTarget(
+            _centerTarget!,
+            _battlefield.Center);
+
+        RefreshDirectionTarget(
+            _rightTarget!,
+            _battlefield.RightFlank);
+
+        _endTurnButton!.Enabled = !_battlefield.IsFinished;
 
         if (_resultModalShown)
             return;
 
-        switch (battlefield.Result)
+        switch (_battlefield.Result)
         {
             case BattlefieldResult.PlayerVictory:
                 _resultModalShown = true;
@@ -295,23 +579,123 @@ internal sealed class BattleScene : IGameScene
         }
     }
 
-    private static string FormatDirection(
-    BattleDirection direction,
+    private static void RefreshDirectionTarget(
+    BattleDirectionDropTarget target,
     BattleDirectionState state)
     {
-        var status = state.IsFinished
-            ? state.Control switch
-            {
-                DirectionControl.Player => "CONTROLLED BY PLAYER",
-                DirectionControl.Enemy => "CONTROLLED BY ENEMY",
-                _ => "NO CONTROL"
-            }
-            : "BATTLE IN PROGRESS";
+        var player = state.PlayerDetachment;
+        var enemy = state.EnemyDetachment;
 
-        return
-            $"{direction}: " +
-            $"PLAYER {state.PlayerDetachment.Health}/{state.PlayerDetachment.MaxHealth} | " +
-            $"ENEMY {state.EnemyDetachment.Health}/{state.EnemyDetachment.MaxHealth} | " +
-            status;
+        var effects = string.Empty;
+
+        if (state.PendingArtilleryDamage > 0)
+        {
+            effects +=
+                $"АРТИЛЛЕРИЯ: +{state.PendingArtilleryDamage} урона\n";
+        }
+
+        if (state.PendingSmokeReductionPercent > 0)
+        {
+            effects +=
+                $"ДЫМ: -{state.PendingSmokeReductionPercent}% урона противника\n";
+        }
+
+        if (state.PendingSupplyHealing > 0)
+        {
+            effects +=
+                $"СНАБЖЕНИЕ: до +{state.PendingSupplyHealing} HP\n";
+        }
+
+        if (string.IsNullOrEmpty(effects))
+        {
+            effects = "ЭФФЕКТЫ: НЕТ";
+        }
+        else
+        {
+            effects = "ПОДГОТОВЛЕНО:\n" + effects.TrimEnd();
+        }
+
+        target.SetState(
+            $"ИГРОК: {player.Definition.Name}\n" +
+            $"ЗДОРОВЬЕ: {player.Health}/{player.MaxHealth}\n" +
+            $"АТАКА: {player.Attack}",
+
+            $"ПРОТИВНИК: {enemy.Definition.Name}\n" +
+            $"ЗДОРОВЬЕ: {enemy.Health}/{enemy.MaxHealth}\n" +
+            $"АТАКА: {enemy.Attack}",
+
+            $"ПРИКАЗ: {player.Order?.Name ?? "—"}",
+
+            effects,
+
+            state.IsFinished);
+    }
+
+    private void OnHostResized(
+        int width,
+        int height)
+    {
+        _ui?.Resize(width, height);
+
+        if (_backgroundPanel is not null)
+        {
+            _backgroundPanel.Width = width;
+            _backgroundPanel.Height = height;
+        }
+
+        if (_handBackground is not null)
+        {
+            _handBackground.Width = width;
+        }
+
+        RefreshHandUi(width);
+    }
+
+    private void ReturnToHeadquarters(CombatResult result)
+    {
+        var operation = _campaign.CurrentOperation
+            ?? throw new InvalidOperationException(
+                "There is no active operation.");
+
+        if (result == CombatResult.PlayerVictory)
+        {
+            var operationCompleted =
+                operation.RegisterBattleVictory();
+
+            if (operationCompleted)
+            {
+                _campaign.CompleteCurrentOperation(
+                    OperationOutcome.Victory);
+
+                _requestScene?.Invoke(
+                    new HeadquartersScene(_campaign));
+
+                return;
+            }
+
+            // Следующее сражение той же операции.
+            _requestScene?.Invoke(
+                new BattleScene(_campaign, _deployment));
+
+            return;
+        }
+
+        if (result == CombatResult.PlayerDefeat)
+        {
+            operation.RegisterBattleDefeat();
+
+            _campaign.CompleteCurrentOperation(
+                OperationOutcome.Defeat);
+
+            _requestScene?.Invoke(
+                new HeadquartersScene(_campaign));
+
+            return;
+        }
+
+        throw new ArgumentOutOfRangeException(
+            nameof(result),
+            result,
+            "Cannot leave an unfinished battle.");
     }
 }

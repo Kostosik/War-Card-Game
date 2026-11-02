@@ -57,6 +57,22 @@ public sealed class ArmyDeploymentState
         _available = Array.AsReadOnly(definitions);
     }
 
+    public bool TryAssignOrder(
+    BattleDirection direction,
+    string orderId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(orderId);
+
+        var order = DetachmentOrders.All
+            .FirstOrDefault(item => item.Id == orderId);
+
+        if (order is null || !_orders.ContainsKey(direction))
+            return false;
+
+        _orders[direction] = order;
+        return true;
+    }
+
     public bool TryAssign(
         BattleDirection direction,
         string detachmentId)

@@ -2,13 +2,61 @@
 
 internal sealed class OperationState
 {
+    public const int TotalBattleCount = 4;
+
     private readonly List<string> _selectedCardIds = [];
+    private readonly List<OperationBattleResult> _battleResults = [];
 
     public IReadOnlyList<string> SelectedCardIds => _selectedCardIds;
+
+    public IReadOnlyList<OperationBattleResult> BattleResults =>
+        _battleResults;
+
+    public int CurrentBattleNumber { get; private set; } = 1;
+
+    public int CompletedBattleCount => _battleResults.Count;
+
+    public int WonBattleCount =>
+        _battleResults.Count(
+            result => result == OperationBattleResult.Victory);
+
+    public bool IsFinalBattle =>
+        CurrentBattleNumber == TotalBattleCount;
 
     public OperationOutcome? Outcome { get; private set; }
 
     public bool IsCompleted => Outcome.HasValue;
+
+    public OperationDefinition Definition { get; }
+
+    public OperationState(OperationDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        Definition = definition;
+    }
+
+    public bool RegisterBattleVictory()
+    {
+        EnsureNotCompleted();
+        EnsureBattleCanBeRecorded();
+
+        _battleResults.Add(OperationBattleResult.Victory);
+
+        if (IsFinalBattle)
+            return true;
+
+        CurrentBattleNumber++;
+
+        return false;
+    }
+
+    public void RegisterBattleDefeat()
+    {
+        EnsureNotCompleted();
+        EnsureBattleCanBeRecorded();
+
+        _battleResults.Add(OperationBattleResult.Defeat);
+    }
 
     public void SetSelectedCards(IEnumerable<string> cardIds)
     {
@@ -35,7 +83,10 @@ internal sealed class OperationState
 
             for (var j = i + 1; j < ids.Length; j++)
             {
-                if (string.Equals(ids[i], ids[j], StringComparison.Ordinal))
+                if (string.Equals(
+                    ids[i],
+                    ids[j],
+                    StringComparison.Ordinal))
                 {
                     throw new ArgumentException(
                         "Selected cards must be unique.",
@@ -54,6 +105,15 @@ internal sealed class OperationState
         Outcome = outcome;
     }
 
+    private void EnsureBattleCanBeRecorded()
+    {
+        if (CompletedBattleCount >= TotalBattleCount)
+        {
+            throw new InvalidOperationException(
+                "All battles in this operation have already been completed.");
+        }
+    }
+
     private void EnsureNotCompleted()
     {
         if (IsCompleted)
@@ -62,6 +122,12 @@ internal sealed class OperationState
                 "The operation has already been completed.");
         }
     }
+}
+
+internal enum OperationBattleResult
+{
+    Victory,
+    Defeat
 }
 
 internal enum OperationOutcome

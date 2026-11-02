@@ -43,8 +43,11 @@ internal sealed class CampaignState
     public IReadOnlyList<OperationState> OperationHistory =>
         _completedOperations;
 
-    public OperationState StartNextOperation()
+    public OperationState StartNextOperation(
+        OperationDefinition definition)
     {
+        ArgumentNullException.ThrowIfNull(definition);
+
         if (CurrentOperation is not null)
         {
             throw new InvalidOperationException(
@@ -57,7 +60,7 @@ internal sealed class CampaignState
                 "All regular operations have been completed.");
         }
 
-        CurrentOperation = new OperationState();
+        CurrentOperation = new OperationState(definition);
 
         return CurrentOperation;
     }

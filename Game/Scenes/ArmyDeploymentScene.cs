@@ -8,11 +8,16 @@ using GameProject.Combat.Army;
 using GameProject.Combat.Battlefield;
 using GameProject.Game.Campaign;
 using GameProject.Game.Flow;
+using GameProject.Game.Operations;
 
 namespace GameProject.Game.Scenes;
 
 internal sealed class ArmyDeploymentScene : IGameScene
 {
+    private UiDropdown? _leftOrderDropdown;
+    private UiDropdown? _centerOrderDropdown;
+    private UiDropdown? _rightOrderDropdown;
+    private UiLabel? _operationBriefingLabel;
     private readonly CampaignState _campaign;
     private readonly ArmyDeploymentState _deployment;
 
@@ -31,14 +36,6 @@ internal sealed class ArmyDeploymentScene : IGameScene
     private UiButton? _startButton;
 
     private bool _restoringSelection;
-
-    private readonly Dictionary<BattleDirection, DetachmentOrderDefinition> _orders =
-    new()
-    {
-        [BattleDirection.LeftFlank] = DetachmentOrders.Attack,
-        [BattleDirection.Center] = DetachmentOrders.Attack,
-        [BattleDirection.RightFlank] = DetachmentOrders.Attack
-    };
 
     public ArmyDeploymentScene(CampaignState campaign)
     {
@@ -80,6 +77,21 @@ internal sealed class ArmyDeploymentScene : IGameScene
             35,
             18);
 
+        var operation = OperationCatalog.FirstOperation;
+
+        _operationBriefingLabel = AddLabel(
+            $"ОПЕРАЦИЯ: {operation.Name}\n" +
+            $"ОСНОВНАЯ ЗАДАЧА: {operation.MainObjective}\n" +
+            $"ДОПОЛНИТЕЛЬНОЕ УСЛОВИЕ: {operation.AdditionalObjective}\n" +
+            $"РАЗВЕДКА: {operation.EnemyBriefing}\n" +
+            $"ПЛАН: {operation.BattlePlan}",
+
+            UiAnchor.TopCenter,
+            new Vector2(0, 160),
+            1100,
+            85,
+            13);
+
         _leftDropdown = CreateDropdown(
             BattleDirection.LeftFlank,
             "LEFT FLANK",
@@ -95,18 +107,30 @@ internal sealed class ArmyDeploymentScene : IGameScene
             "RIGHT FLANK",
             400);
 
+        _leftOrderDropdown = CreateOrderDropdown(
+    BattleDirection.LeftFlank,
+    255);
+
+        _centerOrderDropdown = CreateOrderDropdown(
+            BattleDirection.Center,
+            350);
+
+        _rightOrderDropdown = CreateOrderDropdown(
+            BattleDirection.RightFlank,
+            445);
+
         _summaryLabel = AddLabel(
             "",
             UiAnchor.TopCenter,
-            new Vector2(0, 495),
-            850,
-            100,
-            17);
+                new Vector2(0, 555),
+                850,
+                45,
+                17);
 
         _messageLabel = AddLabel(
             "",
-            UiAnchor.TopCenter,
-            new Vector2(0, 610),
+            UiAnchor.BottomLeft,
+            new Vector2(24, -55),
             850,
             35,
             16);
@@ -172,7 +196,10 @@ internal sealed class ArmyDeploymentScene : IGameScene
                 _ui.Root.RemoveChild(_canvas);
             }
         }
-
+        _operationBriefingLabel = null;
+        _leftOrderDropdown = null;
+        _centerOrderDropdown = null;
+        _rightOrderDropdown = null;
         _leftDropdown = null;
         _centerDropdown = null;
         _rightDropdown = null;
@@ -310,9 +337,12 @@ internal sealed class ArmyDeploymentScene : IGameScene
             BattleDirection.RightFlank)?.Name ?? "Not selected";
 
         _summaryLabel.Text =
-            $"LEFT FLANK: {left}\n" +
-            $"CENTER: {center}\n" +
-            $"RIGHT FLANK: {right}";
+            $"LEFT FLANK: {left} — " +
+            $"{_deployment.GetAssignedOrder(BattleDirection.LeftFlank).Name}\n" +
+            $"CENTER: {center} — " +
+            $"{_deployment.GetAssignedOrder(BattleDirection.Center).Name}\n" +
+            $"RIGHT FLANK: {right} — " +
+            $"{_deployment.GetAssignedOrder(BattleDirection.RightFlank).Name}";
 
         _startButton.Enabled = _deployment.IsReadyForBattle;
 
@@ -320,28 +350,6 @@ internal sealed class ArmyDeploymentScene : IGameScene
             (_deployment.IsReadyForBattle
                 ? "Army ready."
                 : "Select three different detachments.");
-    }
-
-    public bool TryAssignOrder(
-    BattleDirection direction,
-    string orderId)
-    {
-        var order = DetachmentOrders.All
-            .FirstOrDefault(item => item.Id == orderId);
-
-        if (order is null || !_orders.ContainsKey(direction))
-            return false;
-
-        _orders[direction] = order;
-        return true;
-    }
-
-    public DetachmentOrderDefinition GetAssignedOrder(
-        BattleDirection direction)
-    {
-        return _orders.TryGetValue(direction, out var order)
-            ? order
-            : throw new ArgumentOutOfRangeException(nameof(direction));
     }
 
     private void StartBattle()
@@ -353,7 +361,8 @@ internal sealed class ArmyDeploymentScene : IGameScene
             return;
         }
 
-        _campaign.StartNextOperation();
+        _campaign.StartNextOperation(
+            OperationCatalog.FirstOperation);
 
         _requestScene?.Invoke(
             new BattleScene(_campaign, _deployment));
@@ -391,5 +400,55 @@ internal sealed class ArmyDeploymentScene : IGameScene
         widget.LayoutMode = UiLayoutMode.Anchor;
         widget.Anchor = anchor;
         widget.Offset = offset;
+    }
+
+    private UiDropdown CreateOrderDropdown(
+    BattleDirection direction,
+    float y)
+    {
+        AddLabel(
+            "ORDER",
+            UiAnchor.TopCenter,
+            new Vector2(-280, y),
+            220,
+            44,
+            16);
+
+        var dropdown = new UiDropdown
+        {
+            Width = 370,
+            Height = 44
+        };
+
+        ConfigureAnchor(
+            dropdown,
+            UiAnchor.TopCenter,
+            new Vector2(150, y));
+
+        foreach (var order in DetachmentOrders.All)
+        {
+            dropdown.AddOption(order.Name);
+        }
+
+        dropdown.SetSelectedIndex(0);
+
+        dropdown.SelectionChanged +=
+            (index, _) =>
+            {
+                if (index < 0 || index >= DetachmentOrders.All.Count)
+                    return;
+
+                var order = DetachmentOrders.All[index];
+
+                _deployment.TryAssignOrder(
+                    direction,
+                    order.Id);
+
+                RefreshUi();
+            };
+
+        _canvas!.AddChild(dropdown);
+
+        return dropdown;
     }
 }

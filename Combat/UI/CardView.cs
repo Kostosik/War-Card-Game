@@ -1,6 +1,5 @@
 ﻿using Engine.Core.Math;
-using Engine.Graphics.Resources;
-using Engine.UI.Assets;
+using Engine.Graphics.Commands;
 using Engine.UI.Controls;
 using Engine.UI.Core;
 using Engine.UI.Input;
@@ -11,60 +10,68 @@ namespace GameProject.Combat.UI;
 
 internal sealed class CardView : UiPanel, IUiDragSource
 {
-    private readonly UiAssetInstance _instance;
+    private const float CardWidth = 142;
+    private const float CardHeight = 180;
 
-    private readonly UiImage _artwork;
-    private readonly UiLabel _title;
-    private readonly UiLabel _cost;
-    private readonly UiLabel _description;
+    private readonly UiCanvas _contentCanvas;
+    private bool _wasHitTestVisible;
     private UiCanvas? _dragCanvas;
+
     private Vector2 _originalPosition;
     private Vector2 _pointerOffset;
-    private CardDefinition _definition;
 
-    public CardView(
-        UiAsset asset,
-        UiAssetInstance instance,
-        CardDefinition definition)
+    public CardDefinition Definition { get; }
+
+    public CardView(CardDefinition definition)
     {
-        ArgumentNullException.ThrowIfNull(asset);
-        ArgumentNullException.ThrowIfNull(instance);
         ArgumentNullException.ThrowIfNull(definition);
 
-        _instance = instance;
-        _definition = definition;
+        Definition = definition;
 
-        Width = asset.CanvasSize.X;
-        Height = asset.CanvasSize.Y;
+        Width = CardWidth;
+        Height = CardHeight;
 
-        _artwork = FindElement<UiImage>(
-            asset,
-            instance,
-            "Artwork");
+        Padding = new UiThickness(8);
+        Background = GetBackground(definition.Kind);
 
-        _title = FindElement<UiLabel>(
-            asset,
-            instance,
-            "Title");
+        _contentCanvas = new UiCanvas
+        {
+            ClipChildren = true
+        };
 
-        _cost = FindElement<UiLabel>(
-            asset,
-            instance,
-            "Cost");
+        AddChild(_contentCanvas);
 
-        _description = FindElement<UiLabel>(
-            asset,
-            instance,
-            "Description");
+        AddLabel(
+            GetTitle(definition.Kind),
+            0,
+            5,
+            126,
+            32,
+            15);
 
-        instance.Root.IsHitTestVisible = false;
+        AddLabel(
+            $"{definition.ActionCost} AP",
+            0,
+            42,
+            126,
+            24,
+            13);
 
-        AddChild(instance.Root);
-
-        Refresh();
+        AddLabel(
+            GetDescription(definition),
+            0,
+            76,
+            126,
+            80,
+            13);
     }
 
-    public CardDefinition Definition => _definition;
+    public UiDragPayload? CreateDragPayload(
+        Vector2 startPosition)
+    {
+        return new UiDragPayload<CardDefinition>(
+            Definition);
+    }
 
     public void OnDragStarted(UiDragContext context)
     {
@@ -72,34 +79,42 @@ internal sealed class CardView : UiPanel, IUiDragSource
             ?? throw new InvalidOperationException(
                 "CardView must be placed inside a UiCanvas.");
 
-        _originalPosition =
-            _dragCanvas.GetPosition(this);
+        _originalPosition = _dragCanvas.GetPosition(this);
 
         _pointerOffset = new Vector2(
             context.StartPosition.X - Bounds.X,
             context.StartPosition.Y - Bounds.Y);
+
+        _wasHitTestVisible = IsHitTestVisible;
+        IsHitTestVisible = false;
     }
 
     public void OnDragMoved(UiDragContext context)
     {
         if (_dragCanvas is null)
-        {
             return;
-        }
 
         _dragCanvas.SetPosition(
             this,
             new Vector2(
-                context.Position.X - _pointerOffset.X,
-                context.Position.Y - _pointerOffset.Y));
+                context.Position.X -
+                _pointerOffset.X -
+                _dragCanvas.Bounds.X,
+
+                context.Position.Y -
+                _pointerOffset.Y -
+                _dragCanvas.Bounds.Y));
     }
 
     public void OnDragEnded(
         UiDragContext context,
         UiDragEndReason reason)
     {
+        IsHitTestVisible = _wasHitTestVisible;
+
         if (_dragCanvas is not null &&
-            reason != UiDragEndReason.Dropped)
+            reason != UiDragEndReason.Dropped &&
+            ReferenceEquals(Parent, _dragCanvas))
         {
             _dragCanvas.SetPosition(
                 this,
@@ -109,66 +124,81 @@ internal sealed class CardView : UiPanel, IUiDragSource
         _dragCanvas = null;
     }
 
-    public void SetArtwork(TextureHandle texture)
+    private void AddLabel(
+        string text,
+        float x,
+        float y,
+        float width,
+        float height,
+        float fontSize)
     {
-        _artwork.Texture = texture;
+        var label = new UiLabel(text)
+        {
+            Width = width,
+            Height = height,
+            FontSize = fontSize,
+            Color = UiColor.White
+        };
+
+        _contentCanvas.AddChild(label);
+
+        _contentCanvas.SetPosition(
+            label,
+            new Vector2(x, y));
     }
 
-    public void SetDefinition(CardDefinition definition)
+    private static string GetTitle(CardKind kind)
     {
-        ArgumentNullException.ThrowIfNull(definition);
-
-        _definition = definition;
-
-        Refresh();
+        return kind switch
+        {
+            CardKind.ArtilleryStrike => "АРТИЛЛЕРИЯ",
+            CardKind.SmokeScreen => "ДЫМОВАЯ ЗАВЕСА",
+            CardKind.Supply => "СНАБЖЕНИЕ",
+            CardKind.Attack => "АТАКА",
+            CardKind.Defense => "ЗАЩИТА",
+            _ => kind.ToString()
+        };
     }
 
-    public UiDragPayload? CreateDragPayload(
-        Vector2 startPosition)
+    private static string GetDescription(
+        CardDefinition definition)
     {
-        return new UiDragPayload<CardDefinition>(
-            _definition);
+        return definition.Kind switch
+        {
+            CardKind.ArtilleryStrike =>
+                $"Наносит {definition.Value} дополнительного урона",
+
+            CardKind.SmokeScreen =>
+                $"Снижает урон противника на {definition.Value}%",
+
+            CardKind.Supply =>
+                $"Восстанавливает {definition.Value} здоровья",
+
+            CardKind.Attack =>
+                $"Наносит {definition.Value} урона",
+
+            CardKind.Defense =>
+                $"Защита: {definition.Value}",
+
+            _ => string.Empty
+        };
     }
 
-    private void Refresh()
+    private static UiColor GetBackground(CardKind kind)
     {
-        _title.Text =
-            _definition.Kind switch
-            {
-                CardKind.Attack => "ATTACK",
-                CardKind.Defense => "DEFENSE",
-                _ => _definition.Kind.ToString()
-            };
+        return kind switch
+        {
+            CardKind.ArtilleryStrike =>
+                new UiColor(110, 55, 45),
 
-        _cost.Text =
-            $"AP {_definition.ActionCost}";
+            CardKind.SmokeScreen =>
+                new UiColor(55, 75, 95),
 
-        _description.Text =
-            _definition.Kind switch
-            {
-                CardKind.Attack =>
-                    $"Deal {_definition.Value} damage",
+            CardKind.Supply =>
+                new UiColor(55, 95, 65),
 
-                CardKind.Defense =>
-                    $"Gain {_definition.Value} block",
-
-                _ => string.Empty
-            };
-    }
-
-    private static T FindElement<T>(
-        UiAsset asset,
-        UiAssetInstance instance,
-        string name)
-        where T : UiWidget
-    {
-        var element = asset.Elements.SingleOrDefault(
-            element => element.Name == name)
-            ?? throw new InvalidDataException(
-                $"Card UI element '{name}' was not found.");
-
-        return instance.Get(element.Id) as T
-            ?? throw new InvalidDataException(
-                $"Card UI element '{name}' has an unexpected type.");
+            _ =>
+                new UiColor(55, 55, 65)
+        };
     }
 }

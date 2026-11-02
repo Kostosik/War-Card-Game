@@ -3,5 +3,9 @@
 public enum CardKind
 {
     Attack,
-    Defense
+    Defense,
+
+    ArtilleryStrike,
+    SmokeScreen,
+    Supply
 }

@@ -81,19 +81,63 @@ public sealed class BattlefieldState
         StepNumber++;
     }
 
+    public void QueueArtilleryStrike(
+    BattleDirection direction,
+    int damage)
+    {
+        GetActiveDirection(direction).QueueArtilleryStrike(damage);
+    }
+
+    public void QueueSmokeScreen(
+        BattleDirection direction,
+        int reductionPercent)
+    {
+        GetActiveDirection(direction).QueueSmokeScreen(reductionPercent);
+    }
+
+    public void QueueSupply(
+        BattleDirection direction,
+        int healing)
+    {
+        GetActiveDirection(direction).QueueSupply(healing);
+    }
+
     public DirectionControl GetControl(BattleDirection direction)
     {
-        var state = direction switch
+        return GetDirectionState(direction).Control;
+    }
+
+    private BattleDirectionState GetActiveDirection(
+    BattleDirection direction)
+    {
+        if (IsFinished)
+        {
+            throw new InvalidOperationException(
+                "Battlefield has already finished.");
+        }
+
+        var state = GetDirectionState(direction);
+
+        if (state.IsFinished)
+        {
+            throw new InvalidOperationException(
+                "Cannot apply card effects to a finished direction.");
+        }
+
+        return state;
+    }
+
+    private BattleDirectionState GetDirectionState(
+        BattleDirection direction)
+    {
+        return direction switch
         {
             BattleDirection.LeftFlank => LeftFlank,
             BattleDirection.Center => Center,
             BattleDirection.RightFlank => RightFlank,
 
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(direction))
+            _ => throw new ArgumentOutOfRangeException(nameof(direction))
         };
-
-        return state.Control;
     }
 
     private void ResolveDirection(BattleDirectionState direction)
