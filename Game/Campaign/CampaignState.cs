@@ -180,8 +180,6 @@ internal sealed class CampaignState
                 "There is no active operation.");
 
         operation.Complete(outcome);
-
-        _completedOperations.Add(operation);
         CurrentOperation = null;
 
         if (Stage == CampaignStage.FinalOperation)
@@ -191,9 +189,11 @@ internal sealed class CampaignState
             return;
         }
 
+        _completedOperations.Add(operation);
+
         var positionChange = outcome == OperationOutcome.Victory
-    ? 1
-    : -1;
+            ? 1
+            : -1;
 
         if (outcome == OperationOutcome.Victory &&
             !operation.HasFailedAdditionalObjective)
@@ -204,7 +204,7 @@ internal sealed class CampaignState
         AdjustWarPosition(positionChange);
 
         LatestEvent = CampaignEventCatalog.GetAfterOperation(
-    CompletedRegularOperations);
+            CompletedRegularOperations);
 
         if (LatestEvent is not null)
         {
@@ -231,5 +231,111 @@ internal sealed class CampaignState
             (int)WarPositionLevel.DecisiveAdvantage);
 
         WarPosition = (WarPositionLevel)newValue;
+    }
+
+    internal CampaignSaveData CreateSaveData()
+    {
+        return new CampaignSaveData
+        {
+            RegularOperationCount = RegularOperationCount,
+            Stage = Stage,
+            WarPosition = WarPosition,
+
+            CompletedOperations = _completedOperations
+                .Select(CaptureOperation)
+                .ToList(),
+
+            MissedOpportunityIds = _missedOpportunityIds.ToList(),
+
+            CurrentOperation = CurrentOperation is null
+                ? null
+                : CaptureOperation(CurrentOperation),
+
+            FinalOperationResult = FinalOperationResult is null
+                ? null
+                : CaptureOperation(FinalOperationResult)
+        };
+    }
+
+    internal static CampaignState Restore(CampaignSaveData data)
+    {
+        var campaign = new CampaignState(data.RegularOperationCount)
+        {
+            Stage = data.Stage,
+            WarPosition = data.WarPosition
+        };
+
+        campaign._completedOperations.AddRange(
+            data.CompletedOperations.Select(
+                operation => RestoreOperation(operation, data.WarPosition)));
+
+        campaign._missedOpportunityIds.AddRange(
+            data.MissedOpportunityIds);
+
+        campaign.CurrentOperation = data.CurrentOperation is null
+            ? null
+            : RestoreOperation(data.CurrentOperation, data.WarPosition);
+
+        campaign.FinalOperationResult = data.FinalOperationResult is null
+            ? null
+            : RestoreOperation(data.FinalOperationResult, data.WarPosition);
+
+        if (campaign.CompletedRegularOperations > 0)
+        {
+            campaign.LatestEvent = CampaignEventCatalog.GetAfterOperation(
+                campaign.CompletedRegularOperations);
+        }
+
+        if (campaign.Stage == CampaignStage.RegularOperations &&
+            campaign.CurrentOperation is null)
+        {
+            campaign.PendingOperationChoices =
+                campaign.CompletedRegularOperations switch
+                {
+                    1 => OperationChoiceCatalog.AfterFirstOperation,
+                    2 => OperationChoiceCatalog.AfterSecondOperation,
+                    _ => null
+                };
+        }
+
+        return campaign;
+    }
+
+    private static OperationSaveData CaptureOperation(OperationState operation)
+    {
+        return new OperationSaveData
+        {
+            DefinitionId = operation.Definition.Id,
+            SelectedCardIds = operation.SelectedCardIds.ToList(),
+            BattleResults = operation.BattleResults.ToList(),
+            HasFailedAdditionalObjective =
+                operation.HasFailedAdditionalObjective,
+            Outcome = operation.Outcome
+        };
+    }
+
+    private static OperationState RestoreOperation(
+        OperationSaveData data,
+        WarPositionLevel warPosition)
+    {
+        var definition = OperationCatalog.FindById(data.DefinitionId);
+
+        if (definition is null)
+        {
+            if (data.DefinitionId != "final-command-center")
+            {
+                throw new InvalidDataException(
+                    $"Unknown operation ID: {data.DefinitionId}");
+            }
+
+            definition = FinalOperationCatalog.Create(warPosition);
+        }
+
+        return OperationState.Restore(
+            definition,
+            data.SelectedCardIds,
+            data.BattleResults,
+            data.HasFailedAdditionalObjective,
+            data.Outcome);
     }
 }

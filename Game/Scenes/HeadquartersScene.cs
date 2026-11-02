@@ -71,7 +71,7 @@ internal sealed class HeadquartersScene : IGameScene
             "StartOperationButton");
         _ui.Root.AddChild(_headquartersInstance.Root);
         RefreshCampaignUi();
-
+        CampaignSaveStore.Save(_campaign);
         _startOperationSubscription =
             context.Runtime.Events.Subscribe<StartOperationRequestedEvent>(
                 _ =>
@@ -304,7 +304,7 @@ internal sealed class HeadquartersScene : IGameScene
 
         var operation = _campaign.SelectNextOperation(
             offer.Operation.Id);
-
+        CampaignSaveStore.Save(_campaign);
         _requestScene?.Invoke(
             new ArmyDeploymentScene(
                 _campaign,

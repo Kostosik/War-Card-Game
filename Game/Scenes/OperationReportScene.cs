@@ -49,7 +49,7 @@ internal sealed class OperationReportScene : IGameScene
 
         _context = context;
         _requestScene = requestScene;
-
+        CampaignSaveStore.Save(_campaign);
         _ui = context.CreateUiSystem();
         _canvas = new UiCanvas();
 

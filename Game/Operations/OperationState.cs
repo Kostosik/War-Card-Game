@@ -157,6 +157,30 @@ internal sealed class OperationState
                 "The operation has already been completed.");
         }
     }
+
+    internal static OperationState Restore(
+    OperationDefinition definition,
+    IEnumerable<string> selectedCardIds,
+    IEnumerable<OperationBattleResult> battleResults,
+    bool hasFailedAdditionalObjective,
+    OperationOutcome? outcome)
+    {
+        var state = new OperationState(definition);
+
+        state._selectedCardIds.AddRange(selectedCardIds);
+        state._battleResults.AddRange(battleResults);
+
+        state.HasFailedAdditionalObjective =
+            hasFailedAdditionalObjective;
+
+        state.Outcome = outcome;
+
+        state.CurrentBattleNumber = Math.Min(
+            state._battleResults.Count + 1,
+            TotalBattleCount);
+
+        return state;
+    }
 }
 
 internal enum OperationBattleResult

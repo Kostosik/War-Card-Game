@@ -198,4 +198,17 @@ internal static class OperationCatalog
                 right,
                 enemyDamageReduction));
     }
+
+    public static OperationDefinition? FindById(string id)
+    {
+        return id switch
+        {
+            "oil-node" => FirstOperation,
+            "industrial-facility" => IndustrialFacilityOperation,
+            "river-crossing" => RiverCrossingOperation,
+            "artillery-hub" => ArtilleryHubOperation,
+            "supply-route" => SupplyRouteOperation,
+            _ => null
+        };
+    }
 }
