@@ -14,7 +14,7 @@ internal sealed class BattleDirectionDropTarget :
 {
     private readonly Func<
         BattleDirection,
-        CardDefinition,
+        CardPlayRequest,
         bool> _tryPlayCard;
     private readonly UiLabel _effectsLabel;
     private readonly UiLabel _playerLabel;
@@ -47,7 +47,7 @@ internal sealed class BattleDirectionDropTarget :
     public BattleDirectionDropTarget(
         BattleDirection direction,
         string title,
-        Func<BattleDirection, CardDefinition, bool> tryPlayCard)
+        Func<BattleDirection, CardPlayRequest, bool> tryPlayCard)
     {
         ArgumentNullException.ThrowIfNull(tryPlayCard);
 
@@ -138,7 +138,7 @@ internal sealed class BattleDirectionDropTarget :
     public bool CanAcceptDrop(UiDragPayload payload)
     {
         return !_finished &&
-               payload is UiDragPayload<CardDefinition>;
+               payload is UiDragPayload<CardPlayRequest>;
     }
 
     public void OnDragEnter(UiDragContext context)
@@ -155,12 +155,10 @@ internal sealed class BattleDirectionDropTarget :
 
     public bool OnDrop(UiDragContext context)
     {
-        if (context.Payload is not UiDragPayload<CardDefinition> payload)
+        if (context.Payload is not UiDragPayload<CardPlayRequest> payload)
             return false;
 
-        return _tryPlayCard(
-            Direction,
-            payload.Value);
+        return _tryPlayCard(Direction, payload.Value);
     }
 
     private void UpdateBackground()

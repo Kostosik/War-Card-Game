@@ -9,6 +9,10 @@ using GameProject.Combat.Cards;
 
 namespace GameProject.Combat.UI;
 
+internal sealed record CardPlayRequest(
+    int HandIndex,
+    CardDefinition Definition);
+
 internal sealed class CardView : UiPanel, IUiDragSource
 {
     private const float CardWidth = 142;
@@ -17,19 +21,22 @@ internal sealed class CardView : UiPanel, IUiDragSource
     private readonly UiCanvas _contentCanvas;
     private bool _wasHitTestVisible;
     private UiCanvas? _dragCanvas;
-
+    private readonly int _handIndex;
     private Vector2 _originalPosition;
     private Vector2 _pointerOffset;
 
     public CardDefinition Definition { get; }
 
     public CardView(
-    CardDefinition definition,
-    TextureResourceManager textureResources)
+        int handIndex,
+        CardDefinition definition,
+        TextureResourceManager textureResources)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(handIndex);
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(textureResources);
 
+        _handIndex = handIndex;
         Definition = definition;
 
         Width = CardWidth;
@@ -131,8 +138,8 @@ internal sealed class CardView : UiPanel, IUiDragSource
     public UiDragPayload? CreateDragPayload(
         Vector2 startPosition)
     {
-        return new UiDragPayload<CardDefinition>(
-            Definition);
+        return new UiDragPayload<CardPlayRequest>(
+            new CardPlayRequest(_handIndex, Definition));
     }
 
     public void OnDragStarted(UiDragContext context)

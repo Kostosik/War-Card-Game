@@ -185,6 +185,8 @@ internal sealed class CampaignState
 
     public void CompleteCurrentOperation(OperationOutcome outcome)
     {
+
+
         var operation = CurrentOperation
             ?? throw new InvalidOperationException(
                 "There is no active operation.");

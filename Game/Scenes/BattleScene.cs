@@ -386,13 +386,11 @@ internal sealed class BattleScene : IGameScene
             return;
         }
 
-
-
         _handCanvas.ClearChildren();
 
         var hand = _deck.Hand;
         var width = viewportWidth ??
-            _context?.Host.WindowWidth ?? 1280;
+            _context.Host.WindowWidth;
 
         if (hand.Count == 0)
         {
@@ -406,13 +404,13 @@ internal sealed class BattleScene : IGameScene
             };
 
             _handCanvas.AddChild(emptyLabel);
-
             return;
         }
 
         const float cardWidth = 142;
         const float cardSpacing = 12;
 
+        // Центрируем именно фактическое количество карт.
         var totalWidth =
             hand.Count * cardWidth +
             (hand.Count - 1) * cardSpacing;
@@ -424,6 +422,7 @@ internal sealed class BattleScene : IGameScene
         for (var i = 0; i < hand.Count; i++)
         {
             var cardView = new CardView(
+                i,
                 hand[i],
                 _context.UiResources)
             {
@@ -441,8 +440,8 @@ internal sealed class BattleScene : IGameScene
     }
 
     private bool TryPlayCard(
-        BattleDirection direction,
-        CardDefinition card)
+    BattleDirection direction,
+    CardPlayRequest request)
     {
         if (_battlefield is null ||
             _deck is null ||
@@ -457,18 +456,15 @@ internal sealed class BattleScene : IGameScene
         if (directionState.IsFinished)
             return false;
 
-        var handIndex = -1;
+        var handIndex = request.HandIndex;
 
-        for (var i = 0; i < _deck.Hand.Count; i++)
-        {
-            if (_deck.Hand[i].Id == card.Id)
-            {
-                handIndex = i;
-                break;
-            }
-        }
+        if ((uint)handIndex >= (uint)_deck.Hand.Count)
+            return false;
 
-        if (handIndex < 0)
+        var card = _deck.Hand[handIndex];
+
+        // Защита от устаревшего индекса или другой карты.
+        if (!ReferenceEquals(card, request.Definition))
             return false;
 
         var effect = card.Effect;
@@ -479,8 +475,6 @@ internal sealed class BattleScene : IGameScene
         if (_turn.AvailableActionPoints < card.ActionCost)
             return false;
 
-        // Сначала проверяем и ставим эффект.
-        // Если направление недоступно, карта не оплачивается.
         effect(_battlefield, direction, card.Value);
 
         _turn.TrySpendActionPoints(card.ActionCost);

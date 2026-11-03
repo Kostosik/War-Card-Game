@@ -175,7 +175,7 @@ internal sealed class CampaignProgressionState
                 throw new ArgumentOutOfRangeException();
         }
 
-        _pendingRewardIds.RemoveAt(pendingIndex);
+        _pendingRewardIds.Clear();
     }
 
     internal CampaignProgressionSaveData CreateSaveData()
