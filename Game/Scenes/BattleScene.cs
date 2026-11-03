@@ -1,4 +1,5 @@
-﻿using Engine.Core.Math;
+﻿using Engine.Core.Determinism;
+using Engine.Core.Math;
 using Engine.Core.Time;
 using Engine.Graphics.Commands;
 using Engine.UI.Actions;
@@ -11,6 +12,7 @@ using GameProject.Combat.Cards;
 using GameProject.Combat.UI;
 using GameProject.Game.Campaign;
 using GameProject.Game.Flow;
+using GameProject.Game.Generation;
 using GameProject.Game.Operations;
 using GameProject.Game.Scenes.Modals;
 
@@ -107,7 +109,13 @@ internal sealed class BattleScene : IGameScene
             operation.CurrentBattle.RightTerrain,
             operation.CurrentBattle.Formation);
 
-        _deck = CreateDeck();
+        var deckSeed = GameRandomSeeds.ForBattleDeck(
+            _campaign.CampaignSeed,
+            operation.Definition.Id,
+            operation.CurrentBattleNumber);
+
+        _deck = CreateDeck(
+            new DeterministicRandom(deckSeed));
 
         _turn = new CombatTurnState(
             ActionPointsPerTurn);
@@ -348,7 +356,8 @@ internal sealed class BattleScene : IGameScene
         return label;
     }
 
-    private static CardDeck CreateDeck()
+    private static CardDeck CreateDeck(
+        DeterministicRandom random)
     {
         var cards = new List<CardDefinition>();
 
@@ -360,7 +369,7 @@ internal sealed class BattleScene : IGameScene
             }
         }
 
-        var deck = new CardDeck(cards);
+        var deck = new CardDeck(cards, random);
         deck.ShuffleDrawPile();
 
         return deck;

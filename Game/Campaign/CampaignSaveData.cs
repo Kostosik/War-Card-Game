@@ -5,7 +5,7 @@ namespace GameProject.Game.Campaign;
 internal sealed class CampaignSaveData
 {
     public const int CurrentVersion = 1;
-
+    public ulong? CampaignSeed { get; set; }
     public int Version { get; set; } = CurrentVersion;
 
     public int RegularOperationCount { get; set; }

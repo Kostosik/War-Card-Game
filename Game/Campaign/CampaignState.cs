@@ -10,17 +10,22 @@ internal sealed class CampaignState
     private readonly List<string> _missedOpportunityIds = [];
     public OperationState? FinalOperationResult { get; private set; }
     public CampaignEvent? LatestEvent { get; private set; }
+    public ulong CampaignSeed { get; }
     public IReadOnlyList<string> MissedOpportunityIds =>
     _missedOpportunityIds;
 
     public OperationChoiceSet? PendingOperationChoices { get; private set; }
     public CampaignState(
-        int regularOperationCount = DefaultRegularOperationCount)
+        int regularOperationCount = DefaultRegularOperationCount,
+        ulong? campaignSeed = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
             regularOperationCount);
 
         RegularOperationCount = regularOperationCount;
+
+        CampaignSeed = campaignSeed ??
+            unchecked((ulong)Random.Shared.NextInt64());
     }
 
     public int RegularOperationCount { get; }
@@ -253,16 +258,19 @@ internal sealed class CampaignState
             CurrentOperation = CurrentOperation is null
                 ? null
                 : CaptureOperation(CurrentOperation),
-
+            CampaignSeed = CampaignSeed,
             FinalOperationResult = FinalOperationResult is null
                 ? null
                 : CaptureOperation(FinalOperationResult)
+
         };
     }
 
     internal static CampaignState Restore(CampaignSaveData data)
     {
-        var campaign = new CampaignState(data.RegularOperationCount)
+        var campaign = new CampaignState(
+            data.RegularOperationCount,
+            data.CampaignSeed)
         {
             Stage = data.Stage,
             WarPosition = data.WarPosition
