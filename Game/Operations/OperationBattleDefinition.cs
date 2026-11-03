@@ -8,10 +8,17 @@ internal sealed class OperationBattleDefinition
     public string Briefing { get; }
     public EnemyBattlefieldDefinition EnemyForces { get; }
 
+    public BattleObjectiveDefinition Objective { get; }
+    public BattleTerrainDefinition LeftTerrain { get; }
+    public BattleTerrainDefinition CenterTerrain { get; }
+    public BattleTerrainDefinition RightTerrain { get; }
     public OperationBattleDefinition(
         string name,
         string briefing,
-        EnemyBattlefieldDefinition enemyForces)
+        EnemyBattlefieldDefinition enemyForces,
+        BattleObjectiveDefinition? objective = null, BattleTerrainDefinition? leftTerrain = null,
+BattleTerrainDefinition? centerTerrain = null,
+BattleTerrainDefinition? rightTerrain = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(briefing);
@@ -20,5 +27,11 @@ internal sealed class OperationBattleDefinition
         Name = name;
         Briefing = briefing;
         EnemyForces = enemyForces;
+
+        Objective = objective ??
+            BattleObjectiveDefinition.ControlTerritory;
+        LeftTerrain = leftTerrain ?? BattleTerrainCatalog.OpenField;
+        CenterTerrain = centerTerrain ?? BattleTerrainCatalog.OpenField;
+        RightTerrain = rightTerrain ?? BattleTerrainCatalog.OpenField;
     }
 }

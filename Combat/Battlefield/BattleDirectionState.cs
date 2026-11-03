@@ -10,7 +10,7 @@ public sealed class BattleDirectionState
     private int _pendingSupplyHealing;
     public int EnemyIncomingDamageReductionPercent { get; }
     public DetachmentState EnemyDetachment { get; }
-
+    public BattleTerrainDefinition Terrain { get; }
     public int PendingArtilleryDamage =>
     _pendingArtilleryDamage;
 
@@ -26,11 +26,11 @@ public sealed class BattleDirectionState
 
     public BattleDirectionState(
         DetachmentState playerDetachment,
-        DetachmentState enemyDetachment, int enemyIncomingDamageReductionPercent = 0)
+        DetachmentState enemyDetachment, int enemyIncomingDamageReductionPercent = 0, BattleTerrainDefinition terrain = null)
     {
         ArgumentNullException.ThrowIfNull(playerDetachment);
         ArgumentNullException.ThrowIfNull(enemyDetachment);
-
+        Terrain = terrain ?? BattleTerrainCatalog.OpenField;
         PlayerDetachment = playerDetachment;
         EnemyDetachment = enemyDetachment;
 
@@ -87,15 +87,19 @@ public sealed class BattleDirectionState
         }
     }
 
-    public void ResolveStep()
+    public void ResolveStep(
+        int playerSupportDamage = 0,
+        int enemySupportDamage = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(playerSupportDamage);
+        ArgumentOutOfRangeException.ThrowIfNegative(enemySupportDamage);
+
         if (IsFinished)
         {
             throw new InvalidOperationException(
                 "Cannot advance a finished battle direction.");
         }
 
-        // Снабжение действует до обмена ударами.
         PlayerDetachment.RestoreHealth(_pendingSupplyHealing);
 
         var playerDamage = DetachmentDamageCalculator.Calculate(
@@ -104,16 +108,39 @@ public sealed class BattleDirectionState
         var enemyDamage = DetachmentDamageCalculator.Calculate(
             EnemyDetachment);
 
-        // Артиллерия добавляет урон к атаке игрока.
+        playerDamage = checked(
+    playerDamage + playerSupportDamage);
+
+        enemyDamage = checked(
+            enemyDamage + enemySupportDamage);
+
+        // Река снижает урон механизированных отрядов.
+        playerDamage = ApplyTerrainAttackPenalty(
+            PlayerDetachment,
+            playerDamage);
+
+        enemyDamage = ApplyTerrainAttackPenalty(
+            EnemyDetachment,
+            enemyDamage);
+
+        // Артиллерийская поддержка добавляет урон.
         playerDamage = checked(
             playerDamage + _pendingArtilleryDamage);
 
-        // Дымовая завеса уменьшает урон противника.
+        // Дым снижает входящий урон противника.
         enemyDamage = ScaleDamage(
             enemyDamage,
             100 - _pendingSmokeReductionPercent);
 
-        // Обе стороны атакуют одновременно.
+        // Город защищает обе стороны.
+        playerDamage = ScaleDamage(
+            playerDamage,
+            100 - Terrain.DefenseBonusPercent);
+
+        enemyDamage = ScaleDamage(
+            enemyDamage,
+            100 - Terrain.DefenseBonusPercent);
+
         ApplySimultaneousDamage(
             playerDamage,
             enemyDamage);
@@ -121,10 +148,19 @@ public sealed class BattleDirectionState
         PlayerDetachment.ApplyEndOfRoundEffects();
         EnemyDetachment.ApplyEndOfRoundEffects();
 
-        // Все эффекты действовали только один раунд.
         ClearPendingEffects();
     }
+    private int ApplyTerrainAttackPenalty(
+    DetachmentState attacker,
+    int damage)
+    {
+        if (attacker.Definition.Type != DetachmentType.Mechanized)
+            return damage;
 
+        return ScaleDamage(
+            damage,
+            100 - Terrain.MechanizedAttackPenaltyPercent);
+    }
     private static int ScaleDamage(int damage, int percent)
     {
         return (int)(((long)damage * percent + 50) / 100);
@@ -142,7 +178,9 @@ public sealed class BattleDirectionState
         EnsureCanQueueEffect();
 
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(damage);
-
+        damage = ScaleDamage(
+    damage,
+    100 + Terrain.ArtilleryStrikeBonusPercent);
         _pendingArtilleryDamage =
             checked(_pendingArtilleryDamage + damage);
     }
@@ -156,7 +194,9 @@ public sealed class BattleDirectionState
             throw new ArgumentOutOfRangeException(
                 nameof(reductionPercent));
         }
-
+        reductionPercent = ScaleDamage(
+    reductionPercent,
+    100 + Terrain.SmokeScreenBonusPercent);
         _pendingSmokeReductionPercent = Math.Min(
             100,
             _pendingSmokeReductionPercent + reductionPercent);
@@ -167,7 +207,9 @@ public sealed class BattleDirectionState
         EnsureCanQueueEffect();
 
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(healing);
-
+        healing = ScaleDamage(
+    healing,
+    100 + Terrain.SupplyBonusPercent);
         _pendingSupplyHealing =
             checked(_pendingSupplyHealing + healing);
     }

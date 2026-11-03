@@ -21,7 +21,7 @@ internal sealed class BattleDirectionDropTarget :
     private readonly UiLabel _enemyLabel;
     private readonly UiLabel _orderLabel;
     private readonly UiLabel _hintLabel;
-
+    private readonly UiLabel _terrainLabel;
     private bool _dragHovered;
     private bool _finished;
 
@@ -68,7 +68,14 @@ internal sealed class BattleDirectionDropTarget :
             Height = 32,
             FontSize = 21
         });
+        _terrainLabel = new UiLabel()
+        {
+            Height = 42,
+            FontSize = 13,
+            Color = new UiColor(205, 195, 155)
+        };
 
+        content.AddChild(_terrainLabel);
         _playerLabel = new UiLabel()
         {
             Height = 42,
@@ -114,7 +121,7 @@ internal sealed class BattleDirectionDropTarget :
         string playerInfo,
         string enemyInfo,
         string orderInfo,
-        string effectsInfo,
+        string effectsInfo, string terrainInfo,
         DirectionControl control,bool finished)
     {
         _playerLabel.Text = playerInfo;
@@ -124,7 +131,7 @@ internal sealed class BattleDirectionDropTarget :
         _control = control;
         _finished = finished;
         Enabled = !finished;
-
+        _terrainLabel.Text = terrainInfo;
         UpdateBackground();
     }
 

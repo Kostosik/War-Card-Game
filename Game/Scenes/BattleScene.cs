@@ -23,7 +23,7 @@ internal sealed class BattleScene : IGameScene
     private const int BetweenBattleRecoveryPercent = 50;
     private readonly CampaignState _campaign;
     private readonly ArmyDeploymentState _deployment;
-
+    private UiLabel? _objectiveInfoLabel;
     private GameSceneContext? _context;
     private Action<IGameScene>? _requestScene;
 
@@ -100,7 +100,11 @@ internal sealed class BattleScene : IGameScene
 
         _battlefield = BattlefieldFactory.CreatePrototype(
             _deployment,
-            operation.CurrentBattle.EnemyForces);
+            operation.CurrentBattle.EnemyForces,
+            operation.CurrentBattle.Objective,
+            operation.CurrentBattle.LeftTerrain,
+            operation.CurrentBattle.CenterTerrain,
+            operation.CurrentBattle.RightTerrain);
 
         _deck = CreateDeck();
 
@@ -137,7 +141,7 @@ internal sealed class BattleScene : IGameScene
         {
             _context.Host.Resized -= OnHostResized;
         }
-
+        _objectiveInfoLabel = null;
         _victoryModal?.Dispose();
         _victoryModal = null;
 
@@ -224,7 +228,13 @@ internal sealed class BattleScene : IGameScene
             900,
             30,
             16);
-
+        _objectiveInfoLabel = AddAnchoredLabel(
+            "",
+            UiAnchor.TopCenter,
+            new Vector2(0, 92),
+            1100,
+            26,
+            15);
         _actionPointsLabel = AddAnchoredLabel(
             "",
             UiAnchor.TopLeft,
@@ -303,7 +313,7 @@ internal sealed class BattleScene : IGameScene
             TryPlayCard)
         {
             Width = 350,
-            Height = 320,
+            Height = 360,
             LayoutMode = UiLayoutMode.Anchor,
             Anchor = UiAnchor.TopCenter,
             Offset = new Vector2(offsetX, 120)
@@ -534,13 +544,15 @@ internal sealed class BattleScene : IGameScene
         ? "ФИНАЛЬНАЯ ОПЕРАЦИЯ"
         : $"ОПЕРАЦИЯ {_campaign.CurrentOperationNumber}";
 
-        _battleInfoLabel.Text =
+        _battleInfoLabel!.Text =
             $"{operationTitle} | " +
             $"СРАЖЕНИЕ {operation.CurrentBattleNumber}/" +
             $"{OperationState.TotalBattleCount} | " +
-            $"ХОД {_turn!.TurnNumber} | " +
-            $"КОНТРОЛЬ: ИГРОК {_battlefield.PlayerControlledDirections}/2 | " +
-            $"ПРОТИВНИК {_battlefield.EnemyControlledDirections}/2";
+            $"ХОД {_turn!.TurnNumber}";
+
+        _objectiveInfoLabel!.Text = BuildObjectiveStatus(
+            _battlefield.Objective,
+            _battlefield);
 
         _actionPointsLabel!.Text =
             $"ОЧКИ ДЕЙСТВИЙ: " +
@@ -552,15 +564,18 @@ internal sealed class BattleScene : IGameScene
 
         RefreshDirectionTarget(
             _leftTarget!,
-            _battlefield.LeftFlank);
+            _battlefield.LeftFlank,
+            _battlefield);
 
         RefreshDirectionTarget(
             _centerTarget!,
-            _battlefield.Center);
+            _battlefield.Center,
+            _battlefield);
 
         RefreshDirectionTarget(
             _rightTarget!,
-            _battlefield.RightFlank);
+            _battlefield.RightFlank,
+            _battlefield);
 
         _endTurnButton!.Enabled = !_battlefield.IsFinished;
 
@@ -581,9 +596,95 @@ internal sealed class BattleScene : IGameScene
         }
     }
 
+    private static string BuildObjectiveStatus(
+    BattleObjectiveDefinition objective,
+    BattlefieldState battlefield)
+    {
+        switch (objective.Type)
+        {
+            case BattleObjectiveType.ControlTerritory:
+                return
+                    $"ЦЕЛЬ: ЗАХВАТИТЬ 2 ИЗ 3 НАПРАВЛЕНИЙ | " +
+                    $"НАШ КОНТРОЛЬ: {battlefield.PlayerControlledDirections}/2 | " +
+                    $"ВРАЖЕСКИЙ: {battlefield.EnemyControlledDirections}/2";
+
+            case BattleObjectiveType.Breakthrough:
+                {
+                    var direction = GetDirectionDisplayName(
+                        objective.TargetDirection!.Value);
+
+                    var control = battlefield.GetControl(
+                        objective.TargetDirection.Value);
+
+                    return
+                        $"ЦЕЛЬ: ПРОРЫВ — ЗАХВАТИТЬ {direction} | " +
+                        $"СОСТОЯНИЕ: {GetControlDisplayName(control)}";
+                }
+
+            case BattleObjectiveType.DefendPosition:
+                {
+                    var direction = objective.TargetDirection!.Value;
+                    var progress = Math.Min(
+                        battlefield.StepNumber,
+                        objective.RequiredTurns);
+
+                    var control = battlefield.GetControl(direction);
+
+                    var positionStatus = control == DirectionControl.Enemy
+                        ? "ПОЗИЦИЯ ПОТЕРЯНА"
+                        : "ПОЗИЦИЯ УДЕРЖИВАЕТСЯ";
+
+                    return
+                        $"ЦЕЛЬ: ОБОРОНА — {GetDirectionDisplayName(direction)} | " +
+                        $"ХОДЫ: {progress}/{objective.RequiredTurns} | " +
+                        positionStatus;
+                }
+
+            case BattleObjectiveType.ContainEnemy:
+                {
+                    var progress = Math.Min(
+                        battlefield.StepNumber,
+                        objective.RequiredTurns);
+
+                    return
+                        $"ЦЕЛЬ: СДЕРЖАТЬ ПРОТИВНИКА | " +
+                        $"ХОДЫ: {progress}/{objective.RequiredTurns} | " +
+                        $"ВРАЖЕСКИЙ КОНТРОЛЬ: {battlefield.EnemyControlledDirections}/2";
+                }
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(objective.Type));
+        }
+    }
+
+    private static string GetDirectionDisplayName(
+        BattleDirection direction)
+    {
+        return direction switch
+        {
+            BattleDirection.LeftFlank => "ЛЕВЫЙ ФЛАНГ",
+            BattleDirection.Center => "ЦЕНТР",
+            BattleDirection.RightFlank => "ПРАВЫЙ ФЛАНГ",
+            _ => throw new ArgumentOutOfRangeException(nameof(direction))
+        };
+    }
+
+    private static string GetControlDisplayName(
+        DirectionControl control)
+    {
+        return control switch
+        {
+            DirectionControl.None => "БОЙ ПРОДОЛЖАЕТСЯ",
+            DirectionControl.Player => "НАШ КОНТРОЛЬ",
+            DirectionControl.Enemy => "НАПРАВЛЕНИЕ ПОТЕРЯНО",
+            _ => throw new ArgumentOutOfRangeException(nameof(control))
+        };
+    }
     private static void RefreshDirectionTarget(
-    BattleDirectionDropTarget target,
-    BattleDirectionState state)
+        BattleDirectionDropTarget target,
+        BattleDirectionState state,
+        BattlefieldState battlefield)
     {
         var player = state.PlayerDetachment;
         var enemy = state.EnemyDetachment;
@@ -617,6 +718,25 @@ internal sealed class BattleScene : IGameScene
             effects = "ПОДГОТОВЛЕНО:\n" + effects.TrimEnd();
         }
 
+        var playerSupport = battlefield.GetSupportDamageBonus(
+    target.Direction,
+    DirectionControl.Player);
+
+        var enemySupport = battlefield.GetSupportDamageBonus(
+            target.Direction,
+            DirectionControl.Enemy);
+
+        var supportInfo =
+            playerSupport == 0 && enemySupport == 0
+                ? "ПОДДЕРЖКА: НЕТ"
+                : $"ПОДДЕРЖКА: ИГРОК +{playerSupport} | " +
+                  $"ПРОТИВНИК +{enemySupport}";
+
+        var terrainInfo =
+            $"МЕСТНОСТЬ: {state.Terrain.Name}\n" +
+            $"{state.Terrain.Description}\n" +
+            supportInfo;
+
         target.SetState(
             $"ИГРОК: {player.Definition.Name}\n" +
             $"ЗДОРОВЬЕ: {player.Health}/{player.MaxHealth}\n" +
@@ -629,7 +749,7 @@ internal sealed class BattleScene : IGameScene
             $"ПРИКАЗ: {player.Order?.Name ?? "—"}",
 
             effects,
-
+            $"МЕСТНОСТЬ: {state.Terrain.Name}\n{state.Terrain.Description}",
             state.Control,
             state.IsFinished);
     }

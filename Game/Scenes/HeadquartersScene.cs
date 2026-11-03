@@ -295,8 +295,6 @@ internal sealed class HeadquartersScene : IGameScene
         }
 
         _ui!.Root.AddChild(_choiceCanvas);
-
-        _ui!.Root.AddChild(_choiceCanvas);
     }
 
     private void SelectOperation(OperationOffer offer)

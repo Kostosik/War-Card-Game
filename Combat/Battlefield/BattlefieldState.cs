@@ -23,7 +23,12 @@ public enum BattlefieldResult
 
 public sealed class BattlefieldState
 {
+    private readonly BattleObjectiveDefinition _objective;
+
     public int StepNumber { get; private set; }
+
+    public BattleObjectiveDefinition Objective => _objective;
+
     public BattleDirectionState LeftFlank { get; }
 
     public BattleDirectionState Center { get; }
@@ -33,7 +38,8 @@ public sealed class BattlefieldState
     public BattlefieldState(
         BattleDirectionState leftFlank,
         BattleDirectionState center,
-        BattleDirectionState rightFlank)
+        BattleDirectionState rightFlank,
+        BattleObjectiveDefinition? objective = null)
     {
         ArgumentNullException.ThrowIfNull(leftFlank);
         ArgumentNullException.ThrowIfNull(center);
@@ -42,6 +48,9 @@ public sealed class BattlefieldState
         LeftFlank = leftFlank;
         Center = center;
         RightFlank = rightFlank;
+
+        _objective = objective ??
+            BattleObjectiveDefinition.ControlTerritory;
     }
 
     public int PlayerControlledDirections =>
@@ -49,29 +58,29 @@ public sealed class BattlefieldState
 
     public int EnemyControlledDirections =>
         CountControlledDirections(DirectionControl.Enemy);
+
     public bool AreAllDirectionsFinished =>
-    LeftFlank.IsFinished &&
-    Center.IsFinished &&
-    RightFlank.IsFinished;
-    public BattlefieldResult Result
-    {
-        get
+        LeftFlank.IsFinished &&
+        Center.IsFinished &&
+        RightFlank.IsFinished;
+
+    public BattlefieldResult Result =>
+        _objective.Type switch
         {
-            if (PlayerControlledDirections >= 2)
-                return BattlefieldResult.PlayerVictory;
+            BattleObjectiveType.ControlTerritory =>
+                GetTerritoryResult(),
 
-            if (EnemyControlledDirections >= 2)
-                return BattlefieldResult.PlayerDefeat;
+            BattleObjectiveType.Breakthrough =>
+                GetBreakthroughResult(),
 
-            // Все направления завершены, но игрок
-            // не смог захватить два направления.
-            // Победа остаётся за обороняющейся стороной.
-            if (AreAllDirectionsFinished)
-                return BattlefieldResult.PlayerDefeat;
+            BattleObjectiveType.DefendPosition =>
+                GetDefendPositionResult(),
 
-            return BattlefieldResult.InProgress;
-        }
-    }
+            BattleObjectiveType.ContainEnemy =>
+                GetContainEnemyResult(),
+
+            _ => throw new ArgumentOutOfRangeException()
+        };
 
     public bool IsFinished =>
         Result != BattlefieldResult.InProgress;
@@ -79,45 +88,178 @@ public sealed class BattlefieldState
     public void ResolveStep()
     {
         if (IsFinished)
-        {
             throw new InvalidOperationException(
                 "Battlefield has already finished.");
-        }
 
-        ResolveDirection(LeftFlank);
-        ResolveDirection(Center);
-        ResolveDirection(RightFlank);
+        // Сначала рассчитываем поддержку всех направлений.
+        // Состояние поля пока не изменяется.
+        var leftPlayerSupport =
+            GetSupportDamageBonus(BattleDirection.LeftFlank, DirectionControl.Player);
+        var leftEnemySupport =
+            GetSupportDamageBonus(BattleDirection.LeftFlank, DirectionControl.Enemy);
+
+        var centerPlayerSupport =
+            GetSupportDamageBonus(BattleDirection.Center, DirectionControl.Player);
+        var centerEnemySupport =
+            GetSupportDamageBonus(BattleDirection.Center, DirectionControl.Enemy);
+
+        var rightPlayerSupport =
+            GetSupportDamageBonus(BattleDirection.RightFlank, DirectionControl.Player);
+        var rightEnemySupport =
+            GetSupportDamageBonus(BattleDirection.RightFlank, DirectionControl.Enemy);
+
+        // Только после расчёта всех бонусов разрешаем бой.
+        ResolveDirection(
+            LeftFlank,
+            leftPlayerSupport,
+            leftEnemySupport);
+
+        ResolveDirection(
+            Center,
+            centerPlayerSupport,
+            centerEnemySupport);
+
+        ResolveDirection(
+            RightFlank,
+            rightPlayerSupport,
+            rightEnemySupport);
+
         StepNumber++;
     }
 
-    public void QueueArtilleryStrike(
-    BattleDirection direction,
-    int damage)
+    private void ResolveDirection(
+    BattleDirectionState direction,
+    int playerSupport,
+    int enemySupport)
     {
-        GetActiveDirection(direction).QueueArtilleryStrike(damage);
+        if (!direction.IsFinished)
+            direction.ResolveStep(playerSupport, enemySupport);
+    }
+
+    public void QueueArtilleryStrike(
+        BattleDirection direction,
+        int damage)
+    {
+        GetActiveDirection(direction)
+            .QueueArtilleryStrike(damage);
     }
 
     public void QueueSmokeScreen(
         BattleDirection direction,
         int reductionPercent)
     {
-        GetActiveDirection(direction).QueueSmokeScreen(reductionPercent);
+        GetActiveDirection(direction)
+            .QueueSmokeScreen(reductionPercent);
     }
 
     public void QueueSupply(
         BattleDirection direction,
         int healing)
     {
-        GetActiveDirection(direction).QueueSupply(healing);
+        GetActiveDirection(direction)
+            .QueueSupply(healing);
     }
 
-    public DirectionControl GetControl(BattleDirection direction)
+    public DirectionControl GetControl(
+        BattleDirection direction)
     {
         return GetDirectionState(direction).Control;
     }
 
+    private BattlefieldResult GetTerritoryResult()
+    {
+        if (PlayerControlledDirections >= 2)
+            return BattlefieldResult.PlayerVictory;
+
+        if (EnemyControlledDirections >= 2)
+            return BattlefieldResult.PlayerDefeat;
+
+        if (AreAllDirectionsFinished)
+            return BattlefieldResult.PlayerDefeat;
+
+        return BattlefieldResult.InProgress;
+    }
+
+    private BattlefieldResult GetBreakthroughResult()
+    {
+        var control = GetControl(GetTargetDirection());
+
+        return control switch
+        {
+            DirectionControl.Player =>
+                BattlefieldResult.PlayerVictory,
+
+            DirectionControl.Enemy =>
+                BattlefieldResult.PlayerDefeat,
+
+            _ =>
+                BattlefieldResult.InProgress
+        };
+    }
+
+    private BattlefieldResult GetDefendPositionResult()
+    {
+        var control = GetControl(GetTargetDirection());
+
+        if (control == DirectionControl.Enemy)
+            return BattlefieldResult.PlayerDefeat;
+
+        if (StepNumber >= _objective.RequiredTurns)
+            return BattlefieldResult.PlayerVictory;
+
+        return BattlefieldResult.InProgress;
+    }
+
+    private BattlefieldResult GetContainEnemyResult()
+    {
+        if (EnemyControlledDirections >= 2)
+            return BattlefieldResult.PlayerDefeat;
+
+        if (StepNumber >= _objective.RequiredTurns)
+            return BattlefieldResult.PlayerVictory;
+
+        return BattlefieldResult.InProgress;
+    }
+
+    private const int SupportDamagePerDirection = 1;
+
+    public int GetSupportDamageBonus(
+        BattleDirection direction,
+        DirectionControl side)
+    {
+        if (side == DirectionControl.None)
+            return 0;
+
+        if (side is not (DirectionControl.Player or DirectionControl.Enemy))
+            throw new ArgumentOutOfRangeException(nameof(side));
+
+        var adjacentCount = direction switch
+        {
+            BattleDirection.LeftFlank =>
+                GetControl(BattleDirection.Center) == side ? 1 : 0,
+
+            BattleDirection.Center =>
+                (GetControl(BattleDirection.LeftFlank) == side ? 1 : 0) +
+                (GetControl(BattleDirection.RightFlank) == side ? 1 : 0),
+
+            BattleDirection.RightFlank =>
+                GetControl(BattleDirection.Center) == side ? 1 : 0,
+
+            _ => throw new ArgumentOutOfRangeException(nameof(direction))
+        };
+
+        return adjacentCount * SupportDamagePerDirection;
+    }
+
+    private BattleDirection GetTargetDirection()
+    {
+        return _objective.TargetDirection
+            ?? throw new InvalidOperationException(
+                "This objective requires a target direction.");
+    }
+
     private BattleDirectionState GetActiveDirection(
-    BattleDirection direction)
+        BattleDirection direction)
     {
         if (IsFinished)
         {
@@ -145,11 +287,13 @@ public sealed class BattlefieldState
             BattleDirection.Center => Center,
             BattleDirection.RightFlank => RightFlank,
 
-            _ => throw new ArgumentOutOfRangeException(nameof(direction))
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(direction))
         };
     }
 
-    private void ResolveDirection(BattleDirectionState direction)
+    private void ResolveDirection(
+        BattleDirectionState direction)
     {
         if (!direction.IsFinished)
         {
@@ -157,7 +301,8 @@ public sealed class BattlefieldState
         }
     }
 
-    private int CountControlledDirections(DirectionControl control)
+    private int CountControlledDirections(
+        DirectionControl control)
     {
         var count = 0;
 

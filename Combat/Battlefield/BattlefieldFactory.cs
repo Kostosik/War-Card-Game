@@ -7,7 +7,10 @@ public static class BattlefieldFactory
 {
     public static BattlefieldState CreatePrototype(
         ArmyDeploymentState deployment,
-        EnemyBattlefieldDefinition enemyBattlefield)
+        EnemyBattlefieldDefinition enemyBattlefield,
+        BattleObjectiveDefinition? objective = null, BattleTerrainDefinition? leftTerrain = null,
+BattleTerrainDefinition? centerTerrain = null,
+BattleTerrainDefinition? rightTerrain = null)
     {
         ArgumentNullException.ThrowIfNull(deployment);
         ArgumentNullException.ThrowIfNull(enemyBattlefield);
@@ -23,32 +26,34 @@ public static class BattlefieldFactory
                 deployment.GetAssignedState(BattleDirection.LeftFlank),
                 enemyBattlefield.LeftFlank,
                 deployment.GetAssignedOrder(BattleDirection.LeftFlank),
-                enemyBattlefield.EnemyIncomingDamageReductionPercent),
+                enemyBattlefield.EnemyIncomingDamageReductionPercent,leftTerrain),
 
             CreateDirection(
                 deployment.GetAssignedState(BattleDirection.Center),
                 enemyBattlefield.Center,
                 deployment.GetAssignedOrder(BattleDirection.Center),
-                enemyBattlefield.EnemyIncomingDamageReductionPercent),
+                enemyBattlefield.EnemyIncomingDamageReductionPercent,centerTerrain),
 
             CreateDirection(
                 deployment.GetAssignedState(BattleDirection.RightFlank),
                 enemyBattlefield.RightFlank,
                 deployment.GetAssignedOrder(BattleDirection.RightFlank),
-                enemyBattlefield.EnemyIncomingDamageReductionPercent));
+                enemyBattlefield.EnemyIncomingDamageReductionPercent,rightTerrain),
+            objective);
     }
 
     private static BattleDirectionState CreateDirection(
         DetachmentState playerDetachment,
         DetachmentDefinition enemy,
         DetachmentOrderDefinition playerOrder,
-        int enemyIncomingDamageReductionPercent)
+        int enemyIncomingDamageReductionPercent, BattleTerrainDefinition? terrain)
     {
         playerDetachment.AssignOrder(playerOrder);
 
         return new BattleDirectionState(
             playerDetachment,
             new DetachmentState(enemy),
-            enemyIncomingDamageReductionPercent);
+            enemyIncomingDamageReductionPercent,
+            terrain);
     }
 }
