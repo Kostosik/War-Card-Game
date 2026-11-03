@@ -73,45 +73,57 @@ internal sealed class HeadquartersScene : IGameScene
         RefreshCampaignUi();
         CampaignSaveStore.Save(_campaign);
         _startOperationSubscription =
-            context.Runtime.Events.Subscribe<StartOperationRequestedEvent>(
-                _ =>
-                {
-                    if (_campaign.Progression.HasPendingReward)
-                    {
-                        _requestScene?.Invoke(
-                            new CampaignRewardScene(_campaign));
+    context.Runtime.Events.Subscribe<StartOperationRequestedEvent>(
+        _ =>
+        {
+            if (_campaign.Progression.HasPendingReward)
+            {
+                _requestScene?.Invoke(
+                    new CampaignRewardScene(_campaign));
 
-                        return;
-                    }
-                    if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
-                    {
-                        var finalOperation = FinalOperationCatalog.Create(
-                            _campaign.WarPosition);
+                return;
+            }
 
-                        _requestScene?.Invoke(
-                            new ArmyDeploymentScene(
-                                _campaign,
-                                finalOperation));
+            // Если операция уже создана, продолжаем её подготовку.
+            if (_campaign.CurrentOperation is not null)
+            {
+                _requestScene?.Invoke(
+                    new OperationPreparationScene(_campaign));
 
-                        return;
-                    }
+                return;
+            }
 
-                    if (_campaign.AreRegularOperationsCompleted)
-                        return;
+            // Финальную операцию тоже можно подготовить.
+            if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
+            {
+                var finalOperation = FinalOperationCatalog.Create(
+                    _campaign.WarPosition);
 
-                    var operation = _campaign.CurrentOperation?.Definition;
+                _campaign.StartFinalOperation(finalOperation);
 
-                    if (operation is null)
-                    {
-                        if (_campaign.CompletedRegularOperations != 0)
-                            return;
+                CampaignSaveStore.Save(_campaign);
 
-                        operation = OperationCatalog.FirstOperation;
-                    }
+                _requestScene?.Invoke(
+                    new OperationPreparationScene(_campaign));
 
-                    _requestScene?.Invoke(
-                        new ArmyDeploymentScene(_campaign, operation));
-                });
+                return;
+            }
+
+            if (_campaign.AreRegularOperationsCompleted)
+                return;
+
+            // Начало первой операции.
+            if (_campaign.CompletedRegularOperations != 0)
+                return;
+
+            _campaign.StartNextOperation(
+                OperationCatalog.FirstOperation);
+
+            CampaignSaveStore.Save(_campaign);
+
+            _requestScene?.Invoke(
+                new OperationPreparationScene(_campaign));
+        });
 
 
 
@@ -195,6 +207,11 @@ internal sealed class HeadquartersScene : IGameScene
 
             _startOperationButton.Enabled = true;
             return;
+        }
+
+        if (_campaign.CurrentOperation is not null)
+        {
+            _startOperationButton.Text = "ПРОДОЛЖИТЬ ПОДГОТОВКУ";
         }
 
         if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
@@ -326,13 +343,12 @@ internal sealed class HeadquartersScene : IGameScene
             return;
         }
 
-        var operation = _campaign.SelectNextOperation(
-            offer.Operation.Id);
+        _campaign.SelectNextOperation(offer.Operation.Id);
+
         CampaignSaveStore.Save(_campaign);
+
         _requestScene?.Invoke(
-            new ArmyDeploymentScene(
-                _campaign,
-                operation.Definition));
+            new OperationPreparationScene(_campaign));
     }
 
     private static UiButton FindButton(

@@ -1,4 +1,6 @@
 ﻿using Engine.Core.Determinism;
+using GameProject.Combat.Army;
+using GameProject.Combat.Battlefield;
 using GameProject.Game.Generation;
 using GameProject.Game.Operations;
 
@@ -95,9 +97,50 @@ internal sealed class CampaignState
                 "Regular operations are no longer available.");
         }
 
-        CurrentOperation = new OperationState(definition);
+        CurrentOperation = new OperationState(
+     GenerateRegularOperation(definition));
 
         return CurrentOperation;
+    }
+
+    public bool TryPurchasePreparation(
+    string preparationId,
+    BattleDirection? direction = null,
+    string? terrainId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(preparationId);
+
+        var operation = CurrentOperation
+            ?? throw new InvalidOperationException(
+                "There is no active operation.");
+
+        if (operation.CompletedBattleCount > 0 ||
+            operation.IsCompleted)
+        {
+            return false;
+        }
+
+        var preparation =
+            OperationPreparationCatalog.FindById(preparationId);
+
+        if (preparation is null ||
+            !operation.Preparation.CanPurchase(
+                preparation,
+                direction,
+                terrainId))
+        {
+            return false;
+        }
+
+        if (!Progression.TrySpendResources(preparation.Cost))
+            return false;
+
+        operation.Preparation.Purchase(
+            preparation,
+            direction,
+            terrainId);
+
+        return true;
     }
 
     public void SetNextOperationChoices(OperationChoiceSet choices)
@@ -163,7 +206,8 @@ internal sealed class CampaignState
         }
         PendingOperationChoices = null;
 
-        CurrentOperation = new OperationState(selected.Operation);
+        CurrentOperation = new OperationState(
+    GenerateRegularOperation(selected.Operation));
 
         return CurrentOperation;
     }
@@ -181,6 +225,15 @@ internal sealed class CampaignState
         Stage = CampaignStage.FinalOperation;
 
         return CurrentOperation;
+    }
+
+    private OperationDefinition GenerateRegularOperation(
+    OperationDefinition template)
+    {
+        return new OperationGenerator().Generate(
+            template,
+            CampaignSeed,
+            template.BattleCount);
     }
 
     public void CompleteCurrentOperation(OperationOutcome outcome)
@@ -329,26 +382,62 @@ internal sealed class CampaignState
         return campaign;
     }
 
-    private static OperationSaveData CaptureOperation(OperationState operation)
+    private static OperationSaveData CaptureOperation(
+        OperationState operation)
     {
         return new OperationSaveData
         {
             DefinitionId = operation.Definition.Id,
+
             SelectedCardIds = operation.SelectedCardIds.ToList(),
             BattleResults = operation.BattleResults.ToList(),
+
             HasFailedAdditionalObjective =
                 operation.HasFailedAdditionalObjective,
-            Outcome = operation.Outcome
+
+            Outcome = operation.Outcome,
+            Preparation = operation.Preparation.CreateSaveData(),
+            Battles = operation.Definition.Battles
+                .Select(CaptureBattle)
+                .ToList()
+        };
+    }
+
+    private static OperationBattleSaveData CaptureBattle(
+    OperationBattleDefinition battle)
+    {
+        var definition = battle.Definition;
+        var enemy = definition.EnemyForces;
+
+        return new OperationBattleSaveData
+        {
+            Name = battle.Name,
+            Briefing = battle.Briefing,
+
+            LeftEnemyDetachmentId = enemy.LeftFlank.Id,
+            CenterEnemyDetachmentId = enemy.Center.Id,
+            RightEnemyDetachmentId = enemy.RightFlank.Id,
+
+            EnemyIncomingDamageReductionPercent =
+                enemy.EnemyIncomingDamageReductionPercent,
+
+            ObjectiveId = definition.Objective.Id,
+
+            LeftTerrainId = definition.LeftTerrain.Id,
+            CenterTerrainId = definition.CenterTerrain.Id,
+            RightTerrainId = definition.RightTerrain.Id,
+
+            FormationId = definition.Formation.Id
         };
     }
 
     private static OperationState RestoreOperation(
-        OperationSaveData data,
-        WarPositionLevel warPosition)
+    OperationSaveData data,
+    WarPositionLevel warPosition)
     {
-        var definition = OperationCatalog.FindById(data.DefinitionId);
+        var template = OperationCatalog.FindById(data.DefinitionId);
 
-        if (definition is null)
+        if (template is null)
         {
             if (data.DefinitionId != FinalOperationCatalog.Id)
             {
@@ -356,14 +445,106 @@ internal sealed class CampaignState
                     $"Unknown operation ID: {data.DefinitionId}");
             }
 
-            definition = FinalOperationCatalog.Create(warPosition);
+            template = FinalOperationCatalog.Create(warPosition);
         }
 
-        return OperationState.Restore(
+        OperationDefinition definition = template;
+
+        // Старые сохранения не содержат снимков сражений.
+        // Для них сохраняем прежнее поведение восстановления.
+        if (data.Battles.Count > 0)
+        {
+            if (data.Battles.Count != template.BattleCount)
+            {
+                throw new InvalidDataException(
+                    $"Invalid battle count for operation '{data.DefinitionId}'.");
+            }
+
+            var battles = data.Battles
+                .Select(RestoreBattle)
+                .ToArray();
+
+            definition = new OperationDefinition(
+                template.Id,
+                template.Name,
+                template.MainObjective,
+                template.AdditionalObjective,
+                template.EnemyBriefing,
+                template.BattlePlan,
+                battles,
+                template.AdditionalObjectiveDetachmentIds);
+        }
+
+        var state = OperationState.Restore(
             definition,
             data.SelectedCardIds,
             data.BattleResults,
             data.HasFailedAdditionalObjective,
             data.Outcome);
+
+        state.Preparation.Restore(data.Preparation);
+
+        return state;
+    }
+
+    private static OperationBattleDefinition RestoreBattle(
+        OperationBattleSaveData data)
+    {
+        var leftEnemy = DetachmentCatalog.Enemy.All.FirstOrDefault(
+            item => item.Id == data.LeftEnemyDetachmentId)
+            ?? throw new InvalidDataException(
+                $"Unknown enemy detachment: {data.LeftEnemyDetachmentId}");
+
+        var centerEnemy = DetachmentCatalog.Enemy.All.FirstOrDefault(
+            item => item.Id == data.CenterEnemyDetachmentId)
+            ?? throw new InvalidDataException(
+                $"Unknown enemy detachment: {data.CenterEnemyDetachmentId}");
+
+        var rightEnemy = DetachmentCatalog.Enemy.All.FirstOrDefault(
+            item => item.Id == data.RightEnemyDetachmentId)
+            ?? throw new InvalidDataException(
+                $"Unknown enemy detachment: {data.RightEnemyDetachmentId}");
+
+        var objective = BattleObjectiveCatalog.FindById(data.ObjectiveId)
+            ?? throw new InvalidDataException(
+                $"Unknown objective: {data.ObjectiveId}");
+
+        var leftTerrain = BattleTerrainCatalog.All.FirstOrDefault(
+            item => item.Id == data.LeftTerrainId)
+            ?? throw new InvalidDataException(
+                $"Unknown terrain: {data.LeftTerrainId}");
+
+        var centerTerrain = BattleTerrainCatalog.All.FirstOrDefault(
+            item => item.Id == data.CenterTerrainId)
+            ?? throw new InvalidDataException(
+                $"Unknown terrain: {data.CenterTerrainId}");
+
+        var rightTerrain = BattleTerrainCatalog.All.FirstOrDefault(
+            item => item.Id == data.RightTerrainId)
+            ?? throw new InvalidDataException(
+                $"Unknown terrain: {data.RightTerrainId}");
+
+        var formation = BattleFormationCatalog.FindById(data.FormationId)
+            ?? throw new InvalidDataException(
+                $"Unknown formation: {data.FormationId}");
+
+        var enemyForces = new EnemyBattlefieldDefinition(
+            leftEnemy,
+            centerEnemy,
+            rightEnemy,
+            data.EnemyIncomingDamageReductionPercent);
+
+        var definition = new BattleDefinition(
+            enemyForces,
+            objective,
+            leftTerrain,
+            centerTerrain,
+            rightTerrain,
+            formation);
+
+        return new OperationBattleDefinition(
+            data.Name,
+            data.Briefing,
+            definition);
     }
 }

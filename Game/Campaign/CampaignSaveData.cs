@@ -1,4 +1,5 @@
-﻿using GameProject.Game.Operations;
+﻿using GameProject.Combat.Battlefield;
+using GameProject.Game.Operations;
 
 namespace GameProject.Game.Campaign;
 
@@ -26,6 +27,8 @@ internal sealed class CampaignSaveData
 
 internal sealed class OperationSaveData
 {
+    public OperationPreparationSaveData? Preparation { get; set; }
+    public List<OperationBattleSaveData> Battles { get; set; } = [];
     public string DefinitionId { get; set; } = string.Empty;
 
     public List<string> SelectedCardIds { get; set; } = [];
@@ -35,4 +38,38 @@ internal sealed class OperationSaveData
     public bool HasFailedAdditionalObjective { get; set; }
 
     public OperationOutcome? Outcome { get; set; }
+}
+
+internal sealed class OperationBattleSaveData
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string Briefing { get; set; } = string.Empty;
+
+    public string LeftEnemyDetachmentId { get; set; } = string.Empty;
+
+    public string CenterEnemyDetachmentId { get; set; } = string.Empty;
+
+    public string RightEnemyDetachmentId { get; set; } = string.Empty;
+
+    public int EnemyIncomingDamageReductionPercent { get; set; }
+
+    public string ObjectiveId { get; set; } = string.Empty;
+
+    public string LeftTerrainId { get; set; } = string.Empty;
+
+    public string CenterTerrainId { get; set; } = string.Empty;
+
+    public string RightTerrainId { get; set; } = string.Empty;
+
+    public string FormationId { get; set; } = string.Empty;
+}
+
+internal sealed class OperationPreparationSaveData
+{
+    public List<string> PurchasedIds { get; set; } = [];
+
+    public BattleDirection? TerrainDirection { get; set; }
+
+    public string? TerrainId { get; set; }
 }

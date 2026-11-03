@@ -1,4 +1,5 @@
-﻿using Engine.Core.Determinism;
+﻿
+using Engine.Core.Determinism;
 using GameProject.Game.Operations;
 
 namespace GameProject.Game.Generation;
@@ -19,6 +20,7 @@ internal sealed class OperationGenerator
                 $"Battle count must be between 1 and {template.BattleCount}.");
         }
 
+        var standardProfile = BattleGenerationProfile.Standard;
         var battles = new List<OperationBattleDefinition>(battleCount);
 
         for (var i = 0; i < battleCount; i++)
@@ -34,7 +36,15 @@ internal sealed class OperationGenerator
             var battleGenerator = new BattleGenerator(
                 new DeterministicRandom(battleSeed));
 
-            var battleDefinition = battleGenerator.Generate();
+            // Сохраняем заданную шаблоном сложность конкретного боя.
+            var profile = new BattleGenerationProfile(
+                standardProfile.EnemyDetachments,
+                standardProfile.Objectives,
+                standardProfile.Terrains,
+                standardProfile.Formations,
+                templateBattle.EnemyForces.EnemyIncomingDamageReductionPercent);
+
+            var battleDefinition = battleGenerator.Generate(profile);
 
             battles.Add(
                 new OperationBattleDefinition(

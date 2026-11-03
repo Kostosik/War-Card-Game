@@ -381,6 +381,8 @@ internal sealed class ArmyDeploymentScene : IGameScene
             return;
         }
 
+        CampaignSaveStore.Save(_campaign);
+
         _requestScene?.Invoke(
             new BattleScene(_campaign, _deployment));
     }

@@ -100,14 +100,9 @@ internal sealed class BattleScene : IGameScene
             _uiActions,
             ReturnToHeadquarters);
 
-        _battlefield = BattlefieldFactory.CreatePrototype(
+        _battlefield = BattlefieldFactory.Create(
             _deployment,
-            operation.CurrentBattle.EnemyForces,
-            operation.CurrentBattle.Objective,
-            operation.CurrentBattle.LeftTerrain,
-            operation.CurrentBattle.CenterTerrain,
-            operation.CurrentBattle.RightTerrain,
-            operation.CurrentBattle.Formation);
+            operation.CurrentBattleDefinition);
 
         var deckSeed = GameRandomSeeds.ForBattleDeck(
             _campaign.CampaignSeed,
@@ -116,7 +111,8 @@ internal sealed class BattleScene : IGameScene
 
         _deck = CreateDeck(
             new DeterministicRandom(deckSeed),
-            _campaign.Progression.GetAvailableCards());
+            _campaign.Progression.GetAvailableCards(),
+            operation.Preparation.HasSupplyReserve ? 1 : 0);
 
         _turn = new CombatTurnState(
             ActionPointsPerTurn);
@@ -358,9 +354,13 @@ internal sealed class BattleScene : IGameScene
     }
 
     private static CardDeck CreateDeck(
-        DeterministicRandom random,
-        IReadOnlyList<CardDefinition> availableCards)
+    DeterministicRandom random,
+    IReadOnlyList<CardDefinition> availableCards,
+    int additionalSupplyCopies = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(
+            additionalSupplyCopies);
+
         var cards = new List<CardDefinition>();
 
         foreach (var card in availableCards)
@@ -369,6 +369,11 @@ internal sealed class BattleScene : IGameScene
             {
                 cards.Add(card);
             }
+        }
+
+        for (var i = 0; i < additionalSupplyCopies; i++)
+        {
+            cards.Add(TacticalCardCatalog.Supply);
         }
 
         var deck = new CardDeck(cards, random);
@@ -725,9 +730,12 @@ internal sealed class BattleScene : IGameScene
                 return;
             }
 
-            _deployment.RecoverBetweenBattles(
-                 BetweenBattleRecoveryPercent);
-            // Следующее сражение той же операции.
+            var recoveryPercent =
+                operation.Preparation.HasMedicalSupport
+                    ? 75
+                    : BetweenBattleRecoveryPercent;
+
+            _deployment.RecoverBetweenBattles(recoveryPercent);
             _requestScene?.Invoke(
                 new BattleScene(_campaign, _deployment));
 

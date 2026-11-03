@@ -1,4 +1,7 @@
-﻿namespace GameProject.Game.Operations;
+﻿using GameProject.Combat.Battlefield;
+using GameProject.Game.Campaign;
+
+namespace GameProject.Game.Operations;
 
 internal sealed class OperationState
 {
@@ -28,6 +31,13 @@ internal sealed class OperationState
 
     public bool IsCompleted => Outcome.HasValue;
 
+    public OperationPreparationState Preparation { get; } = new();
+
+    public BattleDefinition CurrentBattleDefinition =>
+        Preparation.ApplyTo(
+            CurrentBattle.Definition,
+            CurrentBattleNumber);
+
     public OperationDefinition Definition { get; }
 
     public OperationState(OperationDefinition definition)
@@ -35,6 +45,8 @@ internal sealed class OperationState
         ArgumentNullException.ThrowIfNull(definition);
         Definition = definition;
     }
+
+
 
     public bool RegisterBattleVictory()
     {
