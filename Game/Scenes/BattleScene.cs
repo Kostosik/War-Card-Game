@@ -104,7 +104,8 @@ internal sealed class BattleScene : IGameScene
             operation.CurrentBattle.Objective,
             operation.CurrentBattle.LeftTerrain,
             operation.CurrentBattle.CenterTerrain,
-            operation.CurrentBattle.RightTerrain);
+            operation.CurrentBattle.RightTerrain,
+            operation.CurrentBattle.Formation);
 
         _deck = CreateDeck();
 
@@ -547,12 +548,10 @@ internal sealed class BattleScene : IGameScene
         _battleInfoLabel!.Text =
             $"{operationTitle} | " +
             $"СРАЖЕНИЕ {operation.CurrentBattleNumber}/" +
-            $"{OperationState.TotalBattleCount} | " +
+            $"{operation.TotalBattleCount} | " +
             $"ХОД {_turn!.TurnNumber}";
 
-        _objectiveInfoLabel!.Text = BuildObjectiveStatus(
-            _battlefield.Objective,
-            _battlefield);
+        _objectiveInfoLabel!.Text = _battlefield.ObjectiveStatus;
 
         _actionPointsLabel!.Text =
             $"ОЧКИ ДЕЙСТВИЙ: " +
@@ -596,91 +595,6 @@ internal sealed class BattleScene : IGameScene
         }
     }
 
-    private static string BuildObjectiveStatus(
-    BattleObjectiveDefinition objective,
-    BattlefieldState battlefield)
-    {
-        switch (objective.Type)
-        {
-            case BattleObjectiveType.ControlTerritory:
-                return
-                    $"ЦЕЛЬ: ЗАХВАТИТЬ 2 ИЗ 3 НАПРАВЛЕНИЙ | " +
-                    $"НАШ КОНТРОЛЬ: {battlefield.PlayerControlledDirections}/2 | " +
-                    $"ВРАЖЕСКИЙ: {battlefield.EnemyControlledDirections}/2";
-
-            case BattleObjectiveType.Breakthrough:
-                {
-                    var direction = GetDirectionDisplayName(
-                        objective.TargetDirection!.Value);
-
-                    var control = battlefield.GetControl(
-                        objective.TargetDirection.Value);
-
-                    return
-                        $"ЦЕЛЬ: ПРОРЫВ — ЗАХВАТИТЬ {direction} | " +
-                        $"СОСТОЯНИЕ: {GetControlDisplayName(control)}";
-                }
-
-            case BattleObjectiveType.DefendPosition:
-                {
-                    var direction = objective.TargetDirection!.Value;
-                    var progress = Math.Min(
-                        battlefield.StepNumber,
-                        objective.RequiredTurns);
-
-                    var control = battlefield.GetControl(direction);
-
-                    var positionStatus = control == DirectionControl.Enemy
-                        ? "ПОЗИЦИЯ ПОТЕРЯНА"
-                        : "ПОЗИЦИЯ УДЕРЖИВАЕТСЯ";
-
-                    return
-                        $"ЦЕЛЬ: ОБОРОНА — {GetDirectionDisplayName(direction)} | " +
-                        $"ХОДЫ: {progress}/{objective.RequiredTurns} | " +
-                        positionStatus;
-                }
-
-            case BattleObjectiveType.ContainEnemy:
-                {
-                    var progress = Math.Min(
-                        battlefield.StepNumber,
-                        objective.RequiredTurns);
-
-                    return
-                        $"ЦЕЛЬ: СДЕРЖАТЬ ПРОТИВНИКА | " +
-                        $"ХОДЫ: {progress}/{objective.RequiredTurns} | " +
-                        $"ВРАЖЕСКИЙ КОНТРОЛЬ: {battlefield.EnemyControlledDirections}/2";
-                }
-
-            default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(objective.Type));
-        }
-    }
-
-    private static string GetDirectionDisplayName(
-        BattleDirection direction)
-    {
-        return direction switch
-        {
-            BattleDirection.LeftFlank => "ЛЕВЫЙ ФЛАНГ",
-            BattleDirection.Center => "ЦЕНТР",
-            BattleDirection.RightFlank => "ПРАВЫЙ ФЛАНГ",
-            _ => throw new ArgumentOutOfRangeException(nameof(direction))
-        };
-    }
-
-    private static string GetControlDisplayName(
-        DirectionControl control)
-    {
-        return control switch
-        {
-            DirectionControl.None => "БОЙ ПРОДОЛЖАЕТСЯ",
-            DirectionControl.Player => "НАШ КОНТРОЛЬ",
-            DirectionControl.Enemy => "НАПРАВЛЕНИЕ ПОТЕРЯНО",
-            _ => throw new ArgumentOutOfRangeException(nameof(control))
-        };
-    }
     private static void RefreshDirectionTarget(
         BattleDirectionDropTarget target,
         BattleDirectionState state,

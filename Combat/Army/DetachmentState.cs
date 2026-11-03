@@ -36,8 +36,7 @@ public sealed class DetachmentState
         if (!IsCombatReady || damage == 0)
             return 0;
 
-        var modifiedDamage =
-            Order?.ModifyIncomingDamage(damage) ?? damage;
+        var modifiedDamage = damage;
 
         var appliedDamage = Math.Min(modifiedDamage, Health);
 

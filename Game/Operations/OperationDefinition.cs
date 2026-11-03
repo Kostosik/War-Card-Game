@@ -9,9 +9,10 @@ internal sealed class OperationDefinition
     public string EnemyBriefing { get; }
     public string BattlePlan { get; }
 
-    public const int BattleCount = 4;
     public IReadOnlyList<string> AdditionalObjectiveDetachmentIds { get; }
     public IReadOnlyList<OperationBattleDefinition> Battles { get; }
+
+    public int BattleCount => Battles.Count;
 
     public OperationDefinition(
         string id,
@@ -19,7 +20,9 @@ internal sealed class OperationDefinition
         string mainObjective,
         string additionalObjective,
         string enemyBriefing,
-        string battlePlan, IEnumerable<OperationBattleDefinition> battles, IReadOnlyList<string> additionalObjectiveDetachmentIds)
+        string battlePlan,
+        IEnumerable<OperationBattleDefinition> battles,
+        IReadOnlyList<string> additionalObjectiveDetachmentIds)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -29,13 +32,14 @@ internal sealed class OperationDefinition
         ArgumentException.ThrowIfNullOrWhiteSpace(battlePlan);
 
         ArgumentNullException.ThrowIfNull(battles);
+        ArgumentNullException.ThrowIfNull(additionalObjectiveDetachmentIds);
 
         var battleArray = battles.ToArray();
 
-        if (battleArray.Length != BattleCount)
+        if (battleArray.Length == 0)
         {
             throw new ArgumentException(
-                $"An operation must contain exactly {BattleCount} battles.",
+                "An operation must contain at least one battle.",
                 nameof(battles));
         }
 
@@ -46,15 +50,16 @@ internal sealed class OperationDefinition
                 nameof(battles));
         }
 
-        Battles = Array.AsReadOnly(battleArray);
-
         Id = id;
         Name = name;
         MainObjective = mainObjective;
         AdditionalObjective = additionalObjective;
         EnemyBriefing = enemyBriefing;
         BattlePlan = battlePlan;
+
+        Battles = Array.AsReadOnly(battleArray);
+
         AdditionalObjectiveDetachmentIds =
-    Array.AsReadOnly(additionalObjectiveDetachmentIds.ToArray());
+            Array.AsReadOnly(additionalObjectiveDetachmentIds.ToArray());
     }
 }

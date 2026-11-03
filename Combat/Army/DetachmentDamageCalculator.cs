@@ -9,7 +9,6 @@ public static class DetachmentDamageCalculator
         if (!attacker.IsCombatReady)
             return 0;
 
-        return attacker.Order?.ModifyOutgoingDamage(attacker.Attack)
-            ?? attacker.Attack;
+        return attacker.Attack;
     }
 }

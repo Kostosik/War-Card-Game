@@ -23,6 +23,7 @@ public enum BattlefieldResult
 
 public sealed class BattlefieldState
 {
+    public BattleFormationDefinition Formation { get; }
     private readonly BattleObjectiveDefinition _objective;
 
     public int StepNumber { get; private set; }
@@ -39,7 +40,8 @@ public sealed class BattlefieldState
         BattleDirectionState leftFlank,
         BattleDirectionState center,
         BattleDirectionState rightFlank,
-        BattleObjectiveDefinition? objective = null)
+        BattleObjectiveDefinition? objective = null,
+        BattleFormationDefinition formation = null)
     {
         ArgumentNullException.ThrowIfNull(leftFlank);
         ArgumentNullException.ThrowIfNull(center);
@@ -51,6 +53,7 @@ public sealed class BattlefieldState
 
         _objective = objective ??
             BattleObjectiveDefinition.ControlTerritory;
+        Formation = formation ?? BattleFormationCatalog.LinearFront;
     }
 
     public int PlayerControlledDirections =>
@@ -65,22 +68,10 @@ public sealed class BattlefieldState
         RightFlank.IsFinished;
 
     public BattlefieldResult Result =>
-        _objective.Type switch
-        {
-            BattleObjectiveType.ControlTerritory =>
-                GetTerritoryResult(),
+        _objective.Rule.Evaluate(CreateSnapshot());
 
-            BattleObjectiveType.Breakthrough =>
-                GetBreakthroughResult(),
-
-            BattleObjectiveType.DefendPosition =>
-                GetDefendPositionResult(),
-
-            BattleObjectiveType.ContainEnemy =>
-                GetContainEnemyResult(),
-
-            _ => throw new ArgumentOutOfRangeException()
-        };
+    public string ObjectiveStatus =>
+        _objective.Rule.BuildStatus(CreateSnapshot());
 
     public bool IsFinished =>
         Result != BattlefieldResult.InProgress;
@@ -127,6 +118,16 @@ public sealed class BattlefieldState
         StepNumber++;
     }
 
+    private BattlefieldSnapshot CreateSnapshot()
+    {
+        return new BattlefieldSnapshot(
+            StepNumber,
+            LeftFlank.Control,
+            Center.Control,
+            RightFlank.Control,
+            AreAllDirectionsFinished);
+    }
+
     private void ResolveDirection(
     BattleDirectionState direction,
     int playerSupport,
@@ -166,96 +167,27 @@ public sealed class BattlefieldState
         return GetDirectionState(direction).Control;
     }
 
-    private BattlefieldResult GetTerritoryResult()
-    {
-        if (PlayerControlledDirections >= 2)
-            return BattlefieldResult.PlayerVictory;
-
-        if (EnemyControlledDirections >= 2)
-            return BattlefieldResult.PlayerDefeat;
-
-        if (AreAllDirectionsFinished)
-            return BattlefieldResult.PlayerDefeat;
-
-        return BattlefieldResult.InProgress;
-    }
-
-    private BattlefieldResult GetBreakthroughResult()
-    {
-        var control = GetControl(GetTargetDirection());
-
-        return control switch
-        {
-            DirectionControl.Player =>
-                BattlefieldResult.PlayerVictory,
-
-            DirectionControl.Enemy =>
-                BattlefieldResult.PlayerDefeat,
-
-            _ =>
-                BattlefieldResult.InProgress
-        };
-    }
-
-    private BattlefieldResult GetDefendPositionResult()
-    {
-        var control = GetControl(GetTargetDirection());
-
-        if (control == DirectionControl.Enemy)
-            return BattlefieldResult.PlayerDefeat;
-
-        if (StepNumber >= _objective.RequiredTurns)
-            return BattlefieldResult.PlayerVictory;
-
-        return BattlefieldResult.InProgress;
-    }
-
-    private BattlefieldResult GetContainEnemyResult()
-    {
-        if (EnemyControlledDirections >= 2)
-            return BattlefieldResult.PlayerDefeat;
-
-        if (StepNumber >= _objective.RequiredTurns)
-            return BattlefieldResult.PlayerVictory;
-
-        return BattlefieldResult.InProgress;
-    }
-
     private const int SupportDamagePerDirection = 1;
 
     public int GetSupportDamageBonus(
-        BattleDirection direction,
-        DirectionControl side)
+    BattleDirection direction,
+    DirectionControl side)
     {
+        if (!Enum.IsDefined(direction))
+            throw new ArgumentOutOfRangeException(nameof(direction));
+
         if (side == DirectionControl.None)
             return 0;
 
-        if (side is not (DirectionControl.Player or DirectionControl.Enemy))
+        if (!Enum.IsDefined(side))
             throw new ArgumentOutOfRangeException(nameof(side));
 
-        var adjacentCount = direction switch
-        {
-            BattleDirection.LeftFlank =>
-                GetControl(BattleDirection.Center) == side ? 1 : 0,
+        var supportedNeighbors = Formation
+            .GetNeighbors(direction)
+            .Count(neighbor => GetControl(neighbor) == side);
 
-            BattleDirection.Center =>
-                (GetControl(BattleDirection.LeftFlank) == side ? 1 : 0) +
-                (GetControl(BattleDirection.RightFlank) == side ? 1 : 0),
-
-            BattleDirection.RightFlank =>
-                GetControl(BattleDirection.Center) == side ? 1 : 0,
-
-            _ => throw new ArgumentOutOfRangeException(nameof(direction))
-        };
-
-        return adjacentCount * SupportDamagePerDirection;
-    }
-
-    private BattleDirection GetTargetDirection()
-    {
-        return _objective.TargetDirection
-            ?? throw new InvalidOperationException(
-                "This objective requires a target direction.");
+        return supportedNeighbors *
+               Formation.SupportDamagePerNeighbor;
     }
 
     private BattleDirectionState GetActiveDirection(

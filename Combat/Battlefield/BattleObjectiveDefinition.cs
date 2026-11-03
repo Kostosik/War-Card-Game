@@ -5,27 +5,42 @@ public enum BattleObjectiveType
     ControlTerritory,
     Breakthrough,
     DefendPosition,
-    ContainEnemy
+    ContainEnemy,
+    Custom
 }
 
 public sealed class BattleObjectiveDefinition
 {
+    public string Id { get; }
+    public string Name { get; }
+    public string Description { get; }
+
+    public IBattleObjectiveRule Rule { get; }
+
+    // Старые свойства пока сохраняем.
+    // Новые игровые системы должны использовать Rule.
     public BattleObjectiveType Type { get; }
-
     public BattleDirection? TargetDirection { get; }
-
     public int RequiredTurns { get; }
 
     public static BattleObjectiveDefinition ControlTerritory { get; } =
-        new(BattleObjectiveType.ControlTerritory, null, 0);
+        new(
+            "control-territory",
+            "Контроль территории",
+            "Захватить два из трёх направлений.",
+            new ControlTerritoryObjectiveRule(),
+            BattleObjectiveType.ControlTerritory);
 
     public static BattleObjectiveDefinition Breakthrough(
         BattleDirection direction)
     {
         return new BattleObjectiveDefinition(
+            $"breakthrough-{direction}",
+            "Прорыв",
+            "Захватить указанное направление.",
+            new BreakthroughObjectiveRule(direction),
             BattleObjectiveType.Breakthrough,
-            direction,
-            0);
+            direction);
     }
 
     public static BattleObjectiveDefinition DefendPosition(
@@ -33,73 +48,63 @@ public sealed class BattleObjectiveDefinition
         int requiredTurns)
     {
         return new BattleObjectiveDefinition(
+            $"defend-{direction}-{requiredTurns}",
+            "Оборона позиции",
+            $"Удерживать направление в течение {requiredTurns} ходов.",
+            new DefendPositionObjectiveRule(direction, requiredTurns),
             BattleObjectiveType.DefendPosition,
             direction,
             requiredTurns);
     }
 
-    public static BattleObjectiveDefinition ContainEnemy(
-        int requiredTurns)
+    public static BattleObjectiveDefinition ContainEnemy(int requiredTurns)
     {
         return new BattleObjectiveDefinition(
+            $"contain-enemy-{requiredTurns}",
+            "Сдерживание противника",
+            $"Не позволить противнику захватить два направления в течение {requiredTurns} ходов.",
+            new ContainEnemyObjectiveRule(requiredTurns),
             BattleObjectiveType.ContainEnemy,
             null,
             requiredTurns);
     }
 
-    private BattleObjectiveDefinition(
-        BattleObjectiveType type,
-        BattleDirection? targetDirection,
-        int requiredTurns)
+    // Для добавления пользовательских целей.
+    public BattleObjectiveDefinition(
+        string id,
+        string name,
+        string description,
+        IBattleObjectiveRule rule)
+        : this(
+            id,
+            name,
+            description,
+            rule,
+            BattleObjectiveType.Custom)
     {
-        switch (type)
-        {
-            case BattleObjectiveType.ControlTerritory:
-                if (targetDirection.HasValue || requiredTurns != 0)
-                    throw new ArgumentException(
-                        "Territory control does not require additional parameters.");
-                break;
+    }
 
-            case BattleObjectiveType.Breakthrough:
-                ValidateDirection(targetDirection);
-                if (requiredTurns != 0)
-                    throw new ArgumentException(
-                        "Breakthrough does not require a turn limit.");
-                break;
+    private BattleObjectiveDefinition(
+        string id,
+        string name,
+        string description,
+        IBattleObjectiveRule rule,
+        BattleObjectiveType type,
+        BattleDirection? targetDirection = null,
+        int requiredTurns = 0)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        ArgumentNullException.ThrowIfNull(rule);
 
-            case BattleObjectiveType.DefendPosition:
-                ValidateDirection(targetDirection);
-                ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
-                    requiredTurns);
-                break;
-
-            case BattleObjectiveType.ContainEnemy:
-                if (targetDirection.HasValue)
-                    throw new ArgumentException(
-                        "Containment does not require a target direction.");
-
-                ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
-                    requiredTurns);
-                break;
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(type));
-        }
+        Id = id;
+        Name = name;
+        Description = description;
+        Rule = rule;
 
         Type = type;
         TargetDirection = targetDirection;
         RequiredTurns = requiredTurns;
-    }
-
-    private static void ValidateDirection(
-        BattleDirection? direction)
-    {
-        if (direction is not (
-            BattleDirection.LeftFlank or
-            BattleDirection.Center or
-            BattleDirection.RightFlank))
-        {
-            throw new ArgumentOutOfRangeException(nameof(direction));
-        }
     }
 }

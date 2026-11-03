@@ -263,7 +263,7 @@ internal sealed class OperationReportScene : IGameScene
             "РЕЗУЛЬТАТЫ СРАЖЕНИЙ:"
         };
 
-        for (var i = 0; i < OperationState.TotalBattleCount; i++)
+        for (var i = 0; i < _operation.TotalBattleCount; i++)
         {
             var result = i < _operation.BattleResults.Count
                 ? _operation.BattleResults[i] switch

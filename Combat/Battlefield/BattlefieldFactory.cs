@@ -1,19 +1,15 @@
-﻿
-using GameProject.Combat.Army;
+﻿using GameProject.Combat.Army;
 
 namespace GameProject.Combat.Battlefield;
 
 public static class BattlefieldFactory
 {
-    public static BattlefieldState CreatePrototype(
+    public static BattlefieldState Create(
         ArmyDeploymentState deployment,
-        EnemyBattlefieldDefinition enemyBattlefield,
-        BattleObjectiveDefinition? objective = null, BattleTerrainDefinition? leftTerrain = null,
-BattleTerrainDefinition? centerTerrain = null,
-BattleTerrainDefinition? rightTerrain = null)
+        BattleDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(deployment);
-        ArgumentNullException.ThrowIfNull(enemyBattlefield);
+        ArgumentNullException.ThrowIfNull(definition);
 
         if (!deployment.IsReadyForBattle)
         {
@@ -21,32 +17,61 @@ BattleTerrainDefinition? rightTerrain = null)
                 "Army deployment is incomplete.");
         }
 
+        var enemy = definition.EnemyForces;
+
         return new BattlefieldState(
             CreateDirection(
                 deployment.GetAssignedState(BattleDirection.LeftFlank),
-                enemyBattlefield.LeftFlank,
+                enemy.LeftFlank,
                 deployment.GetAssignedOrder(BattleDirection.LeftFlank),
-                enemyBattlefield.EnemyIncomingDamageReductionPercent,leftTerrain),
+                enemy.EnemyIncomingDamageReductionPercent,
+                definition.LeftTerrain),
 
             CreateDirection(
                 deployment.GetAssignedState(BattleDirection.Center),
-                enemyBattlefield.Center,
+                enemy.Center,
                 deployment.GetAssignedOrder(BattleDirection.Center),
-                enemyBattlefield.EnemyIncomingDamageReductionPercent,centerTerrain),
+                enemy.EnemyIncomingDamageReductionPercent,
+                definition.CenterTerrain),
 
             CreateDirection(
                 deployment.GetAssignedState(BattleDirection.RightFlank),
-                enemyBattlefield.RightFlank,
+                enemy.RightFlank,
                 deployment.GetAssignedOrder(BattleDirection.RightFlank),
-                enemyBattlefield.EnemyIncomingDamageReductionPercent,rightTerrain),
-            objective);
+                enemy.EnemyIncomingDamageReductionPercent,
+                definition.RightTerrain),
+
+            definition.Objective,
+            definition.Formation);
+    }
+
+    // Старый метод оставляем для совместимости.
+    public static BattlefieldState CreatePrototype(
+        ArmyDeploymentState deployment,
+        EnemyBattlefieldDefinition enemyBattlefield,
+        BattleObjectiveDefinition? objective = null,
+        BattleTerrainDefinition? leftTerrain = null,
+        BattleTerrainDefinition? centerTerrain = null,
+        BattleTerrainDefinition? rightTerrain = null,
+        BattleFormationDefinition? formation = null)
+    {
+        return Create(
+            deployment,
+            new BattleDefinition(
+                enemyBattlefield,
+                objective,
+                leftTerrain,
+                centerTerrain,
+                rightTerrain,
+                formation));
     }
 
     private static BattleDirectionState CreateDirection(
         DetachmentState playerDetachment,
         DetachmentDefinition enemy,
         DetachmentOrderDefinition playerOrder,
-        int enemyIncomingDamageReductionPercent, BattleTerrainDefinition? terrain)
+        int enemyIncomingDamageReductionPercent,
+        BattleTerrainDefinition terrain)
     {
         playerDetachment.AssignOrder(playerOrder);
 

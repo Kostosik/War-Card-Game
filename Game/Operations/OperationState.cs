@@ -2,7 +2,7 @@
 
 internal sealed class OperationState
 {
-    public const int TotalBattleCount = OperationDefinition.BattleCount;
+    public int TotalBattleCount => Definition.BattleCount;
 
     private readonly List<string> _selectedCardIds = [];
     private readonly List<OperationBattleResult> _battleResults = [];
@@ -177,7 +177,7 @@ internal sealed class OperationState
 
         state.CurrentBattleNumber = Math.Min(
             state._battleResults.Count + 1,
-            TotalBattleCount);
+             state.TotalBattleCount);
 
         return state;
     }
