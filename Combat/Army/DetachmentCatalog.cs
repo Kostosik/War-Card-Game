@@ -40,6 +40,35 @@ public static class DetachmentCatalog
                 Mechanized,
                 Artillery
             ]);
+
+        public static readonly DetachmentDefinition Engineers =
+    new(
+        "engineers",
+        "Инженерный отряд",
+        115,
+        18,
+        [
+            DetachmentTags.Infantry,
+            DetachmentTags.Engineer
+        ]);
+
+        public static readonly DetachmentDefinition Assault =
+            new(
+                "assault-squad",
+                "Штурмовой отряд",
+                90,
+                29,
+                [
+                    DetachmentTags.Infantry,
+            DetachmentTags.Assault
+                ]);
+
+        public static ReadOnlyCollection<DetachmentDefinition> Unlockable { get; } =
+            Array.AsReadOnly(
+            [
+                Engineers,
+        Assault
+            ]);
     }
 
     public static class Enemy

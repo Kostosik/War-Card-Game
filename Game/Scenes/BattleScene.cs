@@ -115,7 +115,8 @@ internal sealed class BattleScene : IGameScene
             operation.CurrentBattleNumber);
 
         _deck = CreateDeck(
-            new DeterministicRandom(deckSeed));
+            new DeterministicRandom(deckSeed),
+            _campaign.Progression.GetAvailableCards());
 
         _turn = new CombatTurnState(
             ActionPointsPerTurn);
@@ -357,11 +358,12 @@ internal sealed class BattleScene : IGameScene
     }
 
     private static CardDeck CreateDeck(
-        DeterministicRandom random)
+        DeterministicRandom random,
+        IReadOnlyList<CardDefinition> availableCards)
     {
         var cards = new List<CardDefinition>();
 
-        foreach (var card in TacticalCardCatalog.All)
+        foreach (var card in availableCards)
         {
             for (var i = 0; i < card.CopiesInDeck; i++)
             {

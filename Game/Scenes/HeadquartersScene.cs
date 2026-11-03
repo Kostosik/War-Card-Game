@@ -76,6 +76,13 @@ internal sealed class HeadquartersScene : IGameScene
             context.Runtime.Events.Subscribe<StartOperationRequestedEvent>(
                 _ =>
                 {
+                    if (_campaign.Progression.HasPendingReward)
+                    {
+                        _requestScene?.Invoke(
+                            new CampaignRewardScene(_campaign));
+
+                        return;
+                    }
                     if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
                     {
                         var finalOperation = FinalOperationCatalog.Create(
@@ -174,7 +181,21 @@ internal sealed class HeadquartersScene : IGameScene
             $"{_campaign.RemainingRegularOperations}";
         _situationDescriptionLabel.Text +=
     $"\nПоложение на войне: {_campaign.WarPositionDescription}";
+
+        _situationDescriptionLabel.Text +=
+    $"\nРЕСУРСЫ ШТАБА: {_campaign.Progression.Resources}";
+
         var choices = _campaign.PendingOperationChoices;
+
+        if (_campaign.Progression.HasPendingReward)
+        {
+            _situationDescriptionLabel.Text +=
+                "\n\nШТАБ ПОДГОТОВИЛ НАГРАДУ." +
+                "\nНеобходимо выбрать одно из предложений.";
+
+            _startOperationButton.Enabled = true;
+            return;
+        }
 
         if (_campaign.Stage == CampaignStage.FinalOperationAvailable)
         {

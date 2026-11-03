@@ -1,11 +1,13 @@
-﻿using GameProject.Game.Operations;
+﻿using Engine.Core.Determinism;
+using GameProject.Game.Generation;
+using GameProject.Game.Operations;
 
 namespace GameProject.Game.Campaign;
 
 internal sealed class CampaignState
 {
     public const int DefaultRegularOperationCount = 3;
-
+    public CampaignProgressionState Progression { get; private set; } = new();
     private readonly List<OperationState> _completedOperations = [];
     private readonly List<string> _missedOpportunityIds = [];
     public OperationState? FinalOperationResult { get; private set; }
@@ -198,6 +200,19 @@ internal sealed class CampaignState
         }
 
         _completedOperations.Add(operation);
+        Progression.AddResources(
+            CampaignRewardRules.GetResources(operation));
+
+        var rewardSeed = GameRandomSeeds.ForOperationRewards(
+            CampaignSeed,
+            operation.Definition.Id,
+            CompletedRegularOperations);
+
+        var rewardIds = CampaignRewardCatalog.CreateOffers(
+            Progression,
+            new DeterministicRandom(rewardSeed));
+
+        Progression.SetPendingRewards(rewardIds);
 
         var positionChange = outcome == OperationOutcome.Victory
             ? 1
@@ -252,7 +267,7 @@ internal sealed class CampaignState
             CompletedOperations = _completedOperations
                 .Select(CaptureOperation)
                 .ToList(),
-
+            Progression = Progression.CreateSaveData(),
             MissedOpportunityIds = _missedOpportunityIds.ToList(),
 
             CurrentOperation = CurrentOperation is null
@@ -275,6 +290,10 @@ internal sealed class CampaignState
             Stage = data.Stage,
             WarPosition = data.WarPosition
         };
+
+        campaign.Progression = data.Progression is null
+    ? new CampaignProgressionState()
+    : CampaignProgressionState.Restore(data.Progression);
 
         campaign._completedOperations.AddRange(
             data.CompletedOperations.Select(

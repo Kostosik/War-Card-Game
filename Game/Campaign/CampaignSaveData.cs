@@ -21,6 +21,7 @@ internal sealed class CampaignSaveData
     public OperationSaveData? CurrentOperation { get; set; }
 
     public OperationSaveData? FinalOperationResult { get; set; }
+    public CampaignProgressionSaveData? Progression { get; set; }
 }
 
 internal sealed class OperationSaveData

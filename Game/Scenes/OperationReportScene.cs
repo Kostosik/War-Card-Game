@@ -114,16 +114,21 @@ internal sealed class OperationReportScene : IGameScene
         AddLabel(
             campaignCompleted
                 ? BuildBattleResults() + "\n\n" + BuildCampaignSummary()
-                : BuildBattleResults(),
+                : BuildBattleResults() + "\n\n" + BuildOperationRewardSummary(),
             new Vector2(0, 445),
             950,
-            campaignCompleted ? 180 : 130,
+            campaignCompleted ? 180 : 165,
             campaignCompleted ? 14 : 17);
+
+        var hasPendingReward =
+            _campaign.Progression.HasPendingReward;
 
         var backButton = new UiButton(
             campaignCompleted
                 ? "В ГЛАВНОЕ МЕНЮ"
-                : "ВЕРНУТЬСЯ В ШТАБ")
+                : hasPendingReward
+                    ? "ВЫБРАТЬ НАГРАДУ"
+                    : "ВЕРНУТЬСЯ В ШТАБ")
         {
             Width = 260,
             Height = 50,
@@ -135,15 +140,34 @@ internal sealed class OperationReportScene : IGameScene
 
         backButton.Clicked += () =>
         {
-            _requestScene?.Invoke(
-                campaignCompleted
-                    ? new MainMenuScene()
-                    : new HeadquartersScene(_campaign));
+            if (campaignCompleted)
+            {
+                _requestScene?.Invoke(new MainMenuScene());
+            }
+            else if (hasPendingReward)
+            {
+                _requestScene?.Invoke(
+                    new CampaignRewardScene(_campaign));
+            }
+            else
+            {
+                _requestScene?.Invoke(
+                    new HeadquartersScene(_campaign));
+            }
         };
 
         _canvas.AddChild(backButton);
 
         context.Host.Resized += OnHostResized;
+    }
+
+    private string BuildOperationRewardSummary()
+    {
+        var reward = CampaignRewardRules.GetResources(_operation);
+
+        return
+            $"ПОЛУЧЕНО РЕСУРСОВ: +{reward}\n" +
+            $"ЗАПАС ШТАБА: {_campaign.Progression.Resources}";
     }
 
     public void Update(TimeSnapshot time)
@@ -239,7 +263,8 @@ internal sealed class OperationReportScene : IGameScene
             $"{successfulOperations}/{_campaign.RegularOperationCount}\n" +
             $"ВЫПОЛНЕННЫХ ДОПОЛНИТЕЛЬНЫХ УСЛОВИЙ: " +
             $"{completedAdditionalObjectives}/" +
-            $"{_campaign.RegularOperationCount + 1}";
+            $"{_campaign.RegularOperationCount + 1}" + $"\nРЕСУРСЫ ШТАБА: {_campaign.Progression.Resources}"; 
+
     }
 
     private string GetMainObjectiveResult()

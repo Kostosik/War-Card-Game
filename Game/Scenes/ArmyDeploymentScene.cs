@@ -47,7 +47,7 @@ internal sealed class ArmyDeploymentScene : IGameScene
         _operation = operation ?? OperationCatalog.FirstOperation;
 
         _deployment = new ArmyDeploymentState(
-            DetachmentCatalog.CreateInitialRoster());
+            _campaign.Progression.GetAvailableDetachments());
     }
 
     public void Initialize(

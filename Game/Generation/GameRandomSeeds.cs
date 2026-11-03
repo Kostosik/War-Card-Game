@@ -87,6 +87,22 @@ internal static class GameRandomSeeds
         }
     }
 
+    public static ulong ForOperationRewards(
+    ulong campaignSeed,
+    string operationId,
+    int operationNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(operationNumber);
+
+        var scope =
+            $"operation-rewards-v{DerivationVersion}/" +
+            $"{operationId}/" +
+            operationNumber.ToString(CultureInfo.InvariantCulture);
+
+        return Derive(campaignSeed, scope);
+    }
+
     private static void AddByte(
         ref ulong hash,
         byte value)

@@ -11,4 +11,5 @@ public static class DetachmentTags
     public const string Fortified = "fortified";
     public const string Assault = "assault";
     public const string Heavy = "heavy";
+    public const string Engineer = "engineer";
 }

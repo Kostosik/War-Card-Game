@@ -38,6 +38,35 @@ public static class TacticalCardCatalog
             new CardAppearance(55, 95, 65),
             CardEffects.Supply);
 
+    public static readonly CardDefinition HeavyArtillery =
+    new(
+        "heavy-artillery",
+        "ТЯЖЁЛАЯ АРТИЛЛЕРИЯ",
+        "Наносит 30 дополнительного урона.",
+        2,
+        30,
+        2,
+        new CardAppearance(135, 65, 45),
+        CardEffects.ArtilleryStrike);
+
+    public static readonly CardDefinition EmergencySupply =
+        new(
+            "emergency-supply",
+            "АВАРИЙНОЕ СНАБЖЕНИЕ",
+            "Восстанавливает 25 здоровья.",
+            1,
+            25,
+            2,
+            new CardAppearance(75, 115, 75),
+            CardEffects.Supply);
+
+    public static IReadOnlyList<CardDefinition> Unlockable { get; } =
+        Array.AsReadOnly(
+        [
+            HeavyArtillery,
+        EmergencySupply
+        ]);
+
     public static IReadOnlyList<CardDefinition> All { get; } =
         Array.AsReadOnly(
         [
