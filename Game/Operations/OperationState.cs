@@ -1,10 +1,32 @@
 ﻿using GameProject.Combat.Battlefield;
+using GameProject.Combat.Cards;
 using GameProject.Game.Campaign;
 
 namespace GameProject.Game.Operations;
 
 internal sealed class OperationState
 {
+    public const int DeckSize = 10;
+
+    private static readonly string[] DefaultDeckCardIds =
+    [
+        TacticalCardCatalog.ArtilleryStrike.Id,
+    TacticalCardCatalog.ArtilleryStrike.Id,
+    TacticalCardCatalog.ArtilleryStrike.Id,
+
+    TacticalCardCatalog.SmokeScreen.Id,
+    TacticalCardCatalog.SmokeScreen.Id,
+    TacticalCardCatalog.SmokeScreen.Id,
+
+    TacticalCardCatalog.Supply.Id,
+    TacticalCardCatalog.Supply.Id,
+    TacticalCardCatalog.Supply.Id,
+    TacticalCardCatalog.Supply.Id
+    ];
+
+    public bool HasCompleteDeck =>
+        _selectedCardIds.Count == DeckSize;
+
     public int TotalBattleCount => Definition.BattleCount;
 
     private readonly List<string> _selectedCardIds = [];
@@ -43,7 +65,9 @@ internal sealed class OperationState
     public OperationState(OperationDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
+
         Definition = definition;
+        _selectedCardIds.AddRange(DefaultDeckCardIds);
     }
 
 
@@ -83,34 +107,43 @@ internal sealed class OperationState
 
         var ids = cardIds.ToArray();
 
-        if (ids.Length > 3)
+        if (ids.Length != DeckSize)
         {
             throw new ArgumentException(
-                "An operation can have at most three selected cards.",
+                $"A deck must contain exactly {DeckSize} cards.",
                 nameof(cardIds));
         }
 
-        for (var i = 0; i < ids.Length; i++)
+        var catalog = TacticalCardCatalog.All
+            .Concat(TacticalCardCatalog.Unlockable)
+            .ToDictionary(
+                card => card.Id,
+                StringComparer.Ordinal);
+
+        foreach (var group in ids.GroupBy(
+                     id => id,
+                     StringComparer.Ordinal))
         {
-            if (string.IsNullOrWhiteSpace(ids[i]))
+            if (!catalog.TryGetValue(group.Key, out var card))
             {
                 throw new ArgumentException(
-                    "Card IDs cannot be empty.",
+                    $"Unknown card ID: {group.Key}",
                     nameof(cardIds));
             }
 
-            for (var j = i + 1; j < ids.Length; j++)
+            if (group.Count() > card.CopiesInDeck)
             {
-                if (string.Equals(
-                    ids[i],
-                    ids[j],
-                    StringComparison.Ordinal))
-                {
-                    throw new ArgumentException(
-                        "Selected cards must be unique.",
-                        nameof(cardIds));
-                }
+                throw new ArgumentException(
+                    $"Too many copies of card: {group.Key}",
+                    nameof(cardIds));
             }
+        }
+
+        if (ids.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException(
+                "Card IDs cannot be empty.",
+                nameof(cardIds));
         }
 
         _selectedCardIds.Clear();
@@ -179,7 +212,19 @@ internal sealed class OperationState
     {
         var state = new OperationState(definition);
 
-        state._selectedCardIds.AddRange(selectedCardIds);
+        var savedCardIds = selectedCardIds.ToArray();
+
+        if (savedCardIds.Length > DeckSize)
+        {
+            throw new InvalidDataException(
+                "Saved deck contains too many cards.");
+        }
+
+        if (savedCardIds.Length == DeckSize)
+        {
+            state.SetSelectedCards(savedCardIds);
+        }
+
         state._battleResults.AddRange(battleResults);
 
         state.HasFailedAdditionalObjective =

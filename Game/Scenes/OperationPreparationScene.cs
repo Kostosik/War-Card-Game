@@ -6,6 +6,7 @@ using Engine.UI.Controls;
 using Engine.UI.Core;
 using Engine.UI.Layout;
 using GameProject.Combat.Battlefield;
+using GameProject.Combat.Cards;
 using GameProject.Game.Campaign;
 using GameProject.Game.Flow;
 using GameProject.Game.Operations;
@@ -20,6 +21,25 @@ internal sealed class OperationPreparationScene : IGameScene
         BattleDirection.Center,
         BattleDirection.RightFlank
     ];
+
+    private readonly IReadOnlyList<CardDefinition> _availableCards;
+
+    private UiButton? _deckEditorButton;
+    private UiButton? _continueButton;
+
+    private UiPanel? _deckEditorOverlay;
+    private UiPanel? _deckEditorPanel;
+
+    private UiLabel? _deckEditorCountLabel;
+    private UiLabel? _deckEditorStatusLabel;
+
+    private UiButton? _deckApplyButton;
+
+    private readonly Dictionary<string, int> _deckCounts =
+        new(StringComparer.Ordinal);
+
+    private readonly Dictionary<string, UiLabel> _deckCountLabels =
+        new(StringComparer.Ordinal);
 
     private readonly CampaignState _campaign;
     private readonly OperationState _operation;
@@ -48,7 +68,7 @@ internal sealed class OperationPreparationScene : IGameScene
         ArgumentNullException.ThrowIfNull(campaign);
 
         _campaign = campaign;
-
+        _availableCards = campaign.Progression.GetAvailableCards();
         _operation = campaign.CurrentOperation
             ?? throw new ArgumentException(
                 "An active operation is required.",
@@ -211,11 +231,301 @@ internal sealed class OperationPreparationScene : IGameScene
             new Vector2(-150, -28),
             ReturnToHeadquarters);
 
-        AddButton(
+        _deckEditorButton = AddButton(
+            "СОСТАВ КОЛОДЫ",
+            UiAnchor.BottomCenter,
+            new Vector2(0, -82),
+            OpenDeckEditor);
+
+        _continueButton = AddButton(
             "К РАССТАНОВКЕ ОТРЯДОВ",
             UiAnchor.BottomCenter,
             new Vector2(150, -28),
             ContinueToDeployment);
+    }
+
+    private void OpenDeckEditor()
+    {
+        if (_deckEditorOverlay is not null ||
+            _context is null ||
+            _canvas is null)
+        {
+            return;
+        }
+
+        _deckCounts.Clear();
+        _deckCountLabels.Clear();
+
+        foreach (var card in _availableCards)
+        {
+            _deckCounts[card.Id] =
+                _operation.SelectedCardIds.Count(
+                    id => id == card.Id);
+        }
+
+        _deckEditorOverlay = new UiPanel
+        {
+            Width = _context.Host.WindowWidth,
+            Height = _context.Host.WindowHeight,
+            Background = new UiColor(12, 16, 22),
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopLeft,
+            ZIndex = 1000
+        };
+
+        _canvas.AddChild(_deckEditorOverlay);
+
+        _deckEditorPanel = new UiPanel
+        {
+            Width = 1100,
+            Height = 620,
+            Background = new UiColor(31, 38, 49),
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.Center
+        };
+
+        _deckEditorOverlay.AddChild(_deckEditorPanel);
+
+        AddDeckEditorLabel(
+            "СОСТАВ КОЛОДЫ",
+            new Vector2(0, 25),
+            800,
+            40,
+            26);
+
+        _deckEditorCountLabel = AddDeckEditorLabel(
+            "",
+            new Vector2(0, 75),
+            500,
+            30,
+            20);
+
+        for (var i = 0; i < _availableCards.Count; i++)
+        {
+            var card = _availableCards[i];
+            var y = 135 + i * 70;
+
+            AddDeckEditorLabel(
+                $"{card.Title}\n{card.Description}  " +
+                $"(максимум: {card.CopiesInDeck})",
+                new Vector2(-150, y),
+                620,
+                58,
+                14,
+                UiHorizontalAlignment.Left);
+
+            AddDeckEditorButton(
+                "−",
+                new Vector2(300, y + 5),
+                44,
+                () => ChangeDeckCount(card.Id, -1));
+
+            var countLabel = AddDeckEditorLabel(
+                "",
+                new Vector2(370, y + 5),
+                65,
+                38,
+                18);
+
+            _deckCountLabels.Add(card.Id, countLabel);
+
+            AddDeckEditorButton(
+                "+",
+                new Vector2(440, y + 5),
+                44,
+                () => ChangeDeckCount(card.Id, 1));
+        }
+
+        _deckEditorStatusLabel = AddDeckEditorLabel(
+            "",
+            new Vector2(0, 490),
+            900,
+            30,
+            14);
+
+        AddDeckEditorButton(
+            "ОТМЕНА",
+            new Vector2(-135, 550),
+            210,
+            CloseDeckEditor);
+
+        _deckApplyButton = AddDeckEditorButton(
+            "ПРИМЕНИТЬ",
+            new Vector2(135, 550),
+            240,
+            ApplyDeckSelection);
+
+        RefreshDeckEditorUi();
+    }
+
+    private UiLabel AddDeckEditorLabel(
+    string text,
+    Vector2 offset,
+    float width,
+    float height,
+    float fontSize,
+    UiHorizontalAlignment alignment =
+        UiHorizontalAlignment.Center)
+    {
+        var label = new UiLabel(text)
+        {
+            Width = width,
+            Height = height,
+            FontSize = fontSize,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopCenter,
+            Offset = offset,
+            HorizontalAlignment = alignment,
+            VerticalAlignment = UiVerticalAlignment.Center
+        };
+
+        _deckEditorPanel!.AddChild(label);
+
+        return label;
+    }
+
+    private UiButton AddDeckEditorButton(
+        string text,
+        Vector2 offset,
+        float width,
+        Action onClick)
+    {
+        var button = new UiButton(text)
+        {
+            Width = width,
+            Height = 44,
+            FontSize = 18,
+            LayoutMode = UiLayoutMode.Anchor,
+            Anchor = UiAnchor.TopCenter,
+            Offset = offset
+        };
+
+        button.Clicked += onClick;
+
+        _deckEditorPanel!.AddChild(button);
+
+        return button;
+    }
+
+    private void ChangeDeckCount(
+    string cardId,
+    int delta)
+    {
+        if (!_deckCounts.TryGetValue(cardId, out var current))
+            return;
+
+        var card = _availableCards.First(
+            item => item.Id == cardId);
+
+        var total = _deckCounts.Values.Sum();
+
+        if (delta > 0)
+        {
+            if (total >= OperationState.DeckSize)
+            {
+                _deckEditorStatusLabel!.Text =
+                    "Колода уже содержит 10 карт.";
+
+                return;
+            }
+
+            if (current >= card.CopiesInDeck)
+            {
+                _deckEditorStatusLabel!.Text =
+                    "Достигнут лимит копий этой карты.";
+
+                return;
+            }
+        }
+        else if (current <= 0)
+        {
+            return;
+        }
+
+        _deckCounts[cardId] = current + delta;
+
+        RefreshDeckEditorUi();
+    }
+
+    private void RefreshDeckEditorUi()
+    {
+        if (_deckEditorCountLabel is null ||
+            _deckEditorStatusLabel is null ||
+            _deckApplyButton is null)
+        {
+            return;
+        }
+
+        var total = _deckCounts.Values.Sum();
+
+        _deckEditorCountLabel.Text =
+            $"КАРТ В КОЛОДЕ: {total}/{OperationState.DeckSize}";
+
+        foreach (var card in _availableCards)
+        {
+            _deckCountLabels[card.Id].Text =
+                $"{_deckCounts[card.Id]} / {card.CopiesInDeck}";
+        }
+
+        _deckApplyButton.Enabled =
+            total == OperationState.DeckSize;
+
+        _deckEditorStatusLabel.Text =
+            total == OperationState.DeckSize
+                ? "Колода готова к операции."
+                : $"Добавьте ещё {OperationState.DeckSize - total} карт.";
+    }
+
+    private void ApplyDeckSelection()
+    {
+        if (_deckCounts.Values.Sum() != OperationState.DeckSize)
+            return;
+
+        var selectedIds = new List<string>(
+            OperationState.DeckSize);
+
+        foreach (var card in _availableCards)
+        {
+            for (var i = 0; i < _deckCounts[card.Id]; i++)
+            {
+                selectedIds.Add(card.Id);
+            }
+        }
+
+        if (!_campaign.TrySetOperationDeck(selectedIds))
+        {
+            _deckEditorStatusLabel!.Text =
+                "Не удалось сохранить состав колоды.";
+
+            return;
+        }
+
+        CampaignSaveStore.Save(_campaign);
+
+        CloseDeckEditor();
+
+        _statusText = "Состав колоды сохранён.";
+
+        RefreshUi();
+    }
+
+    private void CloseDeckEditor()
+    {
+        if (_deckEditorOverlay is not null &&
+            _canvas is not null)
+        {
+            _canvas.RemoveChild(_deckEditorOverlay);
+        }
+
+        _deckEditorOverlay = null;
+        _deckEditorPanel = null;
+
+        _deckEditorCountLabel = null;
+        _deckEditorStatusLabel = null;
+        _deckApplyButton = null;
+
+        _deckCounts.Clear();
+        _deckCountLabels.Clear();
     }
 
     private void AddTerrainPurchaseButton()
@@ -447,6 +757,20 @@ internal sealed class OperationPreparationScene : IGameScene
             _operation.Preparation.HasReconnaissance
                 ? BuildReconnaissanceReport()
                 : _statusText;
+
+        if (_deckEditorButton is not null)
+        {
+            _deckEditorButton.Text =
+                $"СОСТАВ КОЛОДЫ: " +
+                $"{_operation.SelectedCardIds.Count}/" +
+                $"{OperationState.DeckSize}";
+        }
+
+        if (_continueButton is not null)
+        {
+            _continueButton.Enabled =
+                _operation.HasCompleteDeck;
+        }
     }
 
     private string BuildReconnaissanceReport()
@@ -478,6 +802,12 @@ internal sealed class OperationPreparationScene : IGameScene
                 _campaign.CurrentOperation,
                 _operation))
         {
+            return;
+        }
+
+        if (!_operation.HasCompleteDeck)
+        {
+            OpenDeckEditor();
             return;
         }
 
@@ -532,6 +862,18 @@ internal sealed class OperationPreparationScene : IGameScene
         _ui = null;
         _context = null;
         _requestScene = null;
+
+        _deckEditorOverlay = null;
+        _deckEditorPanel = null;
+
+        _deckEditorCountLabel = null;
+        _deckEditorStatusLabel = null;
+        _deckApplyButton = null;
+        _deckEditorButton = null;
+        _continueButton = null;
+
+        _deckCounts.Clear();
+        _deckCountLabels.Clear();
     }
 
     private void OnHostResized(int width, int height)
@@ -542,6 +884,12 @@ internal sealed class OperationPreparationScene : IGameScene
         {
             _backgroundPanel.Width = width;
             _backgroundPanel.Height = height;
+        }
+
+        if (_deckEditorOverlay is not null)
+        {
+            _deckEditorOverlay.Width = width;
+            _deckEditorOverlay.Height = height;
         }
     }
 }

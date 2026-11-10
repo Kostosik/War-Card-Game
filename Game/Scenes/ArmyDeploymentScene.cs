@@ -381,6 +381,14 @@ internal sealed class ArmyDeploymentScene : IGameScene
             return;
         }
 
+        var activeOperation = _campaign.CurrentOperation;
+
+        if (activeOperation is null ||
+            !activeOperation.HasCompleteDeck)
+        {
+            return;
+        }
+
         CampaignSaveStore.Save(_campaign);
 
         _requestScene?.Invoke(

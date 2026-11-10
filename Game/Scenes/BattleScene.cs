@@ -111,6 +111,7 @@ internal sealed class BattleScene : IGameScene
 
         _deck = CreateDeck(
             new DeterministicRandom(deckSeed),
+            operation.SelectedCardIds,
             _campaign.Progression.GetAvailableCards(),
             operation.Preparation.HasSupplyReserve ? 1 : 0);
 
@@ -355,22 +356,39 @@ internal sealed class BattleScene : IGameScene
 
     private static CardDeck CreateDeck(
     DeterministicRandom random,
+    IReadOnlyList<string> selectedCardIds,
     IReadOnlyList<CardDefinition> availableCards,
     int additionalSupplyCopies = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(
             additionalSupplyCopies);
 
-        var cards = new List<CardDefinition>();
-
-        foreach (var card in availableCards)
+        if (selectedCardIds.Count != OperationState.DeckSize)
         {
-            for (var i = 0; i < card.CopiesInDeck; i++)
-            {
-                cards.Add(card);
-            }
+            throw new InvalidOperationException(
+                "Operation deck is incomplete.");
         }
 
+        var cardsById = availableCards.ToDictionary(
+            card => card.Id,
+            StringComparer.Ordinal);
+
+        var cards = new List<CardDefinition>(
+            selectedCardIds.Count + additionalSupplyCopies);
+
+        foreach (var id in selectedCardIds)
+        {
+            if (!cardsById.TryGetValue(id, out var card))
+            {
+                throw new InvalidDataException(
+                    $"Card is not available: {id}");
+            }
+
+            cards.Add(card);
+        }
+
+        // Преимущество «Резерв снабжения» даёт дополнительную
+        // карту сверх обычных десяти.
         for (var i = 0; i < additionalSupplyCopies; i++)
         {
             cards.Add(TacticalCardCatalog.Supply);

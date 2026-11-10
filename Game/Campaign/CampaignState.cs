@@ -103,6 +103,50 @@ internal sealed class CampaignState
         return CurrentOperation;
     }
 
+    public bool TrySetOperationDeck(IEnumerable<string> cardIds)
+    {
+        ArgumentNullException.ThrowIfNull(cardIds);
+
+        var operation = CurrentOperation
+            ?? throw new InvalidOperationException(
+                "There is no active operation.");
+
+        if (operation.IsCompleted ||
+            operation.CompletedBattleCount > 0)
+        {
+            return false;
+        }
+
+        var ids = cardIds.ToArray();
+
+        if (ids.Length != OperationState.DeckSize)
+            return false;
+
+        var availableCards = Progression.GetAvailableCards()
+            .ToDictionary(
+                card => card.Id,
+                StringComparer.Ordinal);
+
+        foreach (var group in ids.GroupBy(
+                     id => id,
+                     StringComparer.Ordinal))
+        {
+            if (!availableCards.TryGetValue(
+                    group.Key,
+                    out var card))
+            {
+                return false;
+            }
+
+            if (group.Count() > card.CopiesInDeck)
+                return false;
+        }
+
+        operation.SetSelectedCards(ids);
+
+        return true;
+    }
+
     public bool TryPurchasePreparation(
     string preparationId,
     BattleDirection? direction = null,
